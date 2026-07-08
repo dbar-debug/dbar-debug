@@ -14,9 +14,10 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 from app.models import CourtCase, SearchResult
 
 REGISTRY_URL = "https://reyestr.court.gov.ua"
-# Selector names may need updating if the site changes its HTML structure
-SEARCH_INPUT_SELECTOR = "input.search-input, input[placeholder*='пошук'], input[type='search']"
-RESULT_ITEM_SELECTOR = ".result-item, .search-result, article.case"
+SEARCH_INPUT_SELECTOR = "#SearchExpression"
+SUBMIT_BUTTON_SELECTOR = "#btn"
+# Result row selectors — confirmed from site inspection
+RESULT_ITEM_SELECTOR = "tr.odd, tr.even"
 
 
 async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
@@ -49,14 +50,14 @@ async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
             print(f"[scraper] Opening {REGISTRY_URL} ...")
             await page.goto(REGISTRY_URL, wait_until="networkidle", timeout=30_000)
 
-            # Find the search input and type the name
+            # Fill search field and click submit button
             await page.wait_for_selector(SEARCH_INPUT_SELECTOR, timeout=10_000)
             await page.fill(SEARCH_INPUT_SELECTOR, full_name)
-            await page.keyboard.press("Enter")
+            await page.click(SUBMIT_BUTTON_SELECTOR)
             await page.wait_for_load_state("networkidle", timeout=15_000)
 
-            # Try to read total count from the page
-            total_text = await page.text_content(".total-count, .results-count, h2.count")
+            # Total count shown near top of results
+            total_text = await page.text_content(".searchResultText, .pagerRecords, #pagerRecords")
             if total_text:
                 numbers = re.findall(r"\d+", total_text)
                 if numbers:
@@ -71,7 +72,7 @@ async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
                     break
 
                 # Try to click "next page"
-                next_btn = page.locator("a.next, button.next, [aria-label='Наступна']")
+                next_btn = page.locator("a.pagerNext, a[title*='наступ'], a[title*='Наступ']")
                 if await next_btn.count() == 0:
                     break
                 await next_btn.click()
@@ -91,13 +92,7 @@ async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
 async def _parse_results_page(page) -> List[CourtCase]:
     """Extract CourtCase objects from the current results page."""
     cases = []
-
     items = await page.query_selector_all(RESULT_ITEM_SELECTOR)
-
-    # Fallback: try common list structures if the main selector returns nothing
-    if not items:
-        items = await page.query_selector_all("li.result, div[class*='result'], tr.case-row")
-
     for item in items:
         try:
             case = await _extract_case(item)
@@ -105,42 +100,48 @@ async def _parse_results_page(page) -> List[CourtCase]:
                 cases.append(case)
         except Exception as e:
             print(f"[scraper] Skipping item due to error: {e}")
-
     return cases
 
 
 async def _extract_case(item) -> CourtCase | None:
-    """Extract fields from a single result element."""
+    """
+    Extract fields from a single <tr class='odd'|'even'> row.
 
-    def _text(el) -> str:
-        return el.strip() if el else ""
+    reyestr.court.gov.ua table column order (confirmed from HTML):
+      td[0] — document type / title  (contains <a href='/Review/...'>)
+      td[1] — court name
+      td[2] — case number
+      td[3] — date (registration)
+    """
+    def _text(val: str | None) -> str:
+        return val.strip() if val else "—"
 
-    # Try multiple possible selector patterns for each field
-    case_number = _text(await _inner_text(item, ".case-number, [data-field='number'], td.number"))
-    court_name  = _text(await _inner_text(item, ".court-name, [data-field='court'], td.court"))
-    date        = _text(await _inner_text(item, ".date, [data-field='date'], td.date, time"))
-    doc_type    = _text(await _inner_text(item, ".doc-type, [data-field='type'], td.type"))
-    excerpt     = _text(await _inner_text(item, ".excerpt, .snippet, p.text"))
+    tds = await item.query_selector_all("td")
+    if len(tds) < 2:
+        return None
 
-    # Link to the full document
-    link_el = await item.query_selector("a[href*='/Review/'], a.case-link, a.title")
+    # Column 0 — link + document type
+    link_el = await tds[0].query_selector("a[href*='/Review/']")
     url = ""
+    doc_type = ""
     if link_el:
-        href = await link_el.get_attribute("href")
+        href = await link_el.get_attribute("href") or ""
         url = href if href.startswith("http") else f"https://reyestr.court.gov.ua{href}"
-        if not case_number:
-            case_number = _text(await link_el.inner_text())
+        doc_type = _text(await link_el.inner_text())
 
-    if not url and not case_number:
+    court_name  = _text(await tds[1].inner_text()) if len(tds) > 1 else "—"
+    case_number = _text(await tds[2].inner_text()) if len(tds) > 2 else "—"
+    date        = _text(await tds[3].inner_text()) if len(tds) > 3 else "—"
+
+    if not url and case_number == "—":
         return None
 
     return CourtCase(
-        case_number=case_number or "—",
-        court_name=court_name or "—",
-        date=date or "—",
-        document_type=doc_type or "—",
+        case_number=case_number,
+        court_name=court_name,
+        date=date,
+        document_type=doc_type,
         url=url,
-        excerpt=excerpt,
     )
 
 

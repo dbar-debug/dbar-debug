@@ -47,38 +47,26 @@ async def main():
                     attrs[attr] = val
             print(f"    [{i}] {attrs}")
 
-        # ── 3. Спроба знайти поле пошуку і ввести ім'я ──────────────────
-        print(f"\n[3] Шукаю поле пошуку і вводжу: {NAME}")
-        search_selectors = [
-            "input[type='search']",
-            "input[type='text']",
-            "input[placeholder*='пошук']",
-            "input[placeholder*='Пошук']",
-            "input[placeholder*='search']",
-            "input.search",
-            "#search",
-            "#Search",
-            "input[name*='search']",
-            "input[name*='Search']",
-            "input[name*='text']",
-        ]
+        # ── 3. Ввести ім'я і натиснути кнопку пошуку ────────────────────
+        print(f"\n[3] Вводжу в #SearchExpression: {NAME}")
+        await page.fill("#SearchExpression", NAME)
 
-        found_selector = None
-        for sel in search_selectors:
-            el = await page.query_selector(sel)
-            if el:
-                found_selector = sel
-                print(f"    Знайдено за селектором: {sel}")
-                break
+        print("    Клікаю кнопку #btn ...")
+        await page.click("#btn")
 
-        if not found_selector:
-            print("    УВАГА: поле пошуку не знайдено жодним з селекторів!")
-            print("    Перевірте debug_output/1_homepage.html вручну")
-        else:
-            await page.fill(found_selector, NAME)
-            await page.keyboard.press("Enter")
-            print("    Очікую результати ...")
-            await page.wait_for_load_state("networkidle", timeout=20_000)
+        # Чекаємо поки AJAX завантажить результати
+        print("    Очікую результати (AJAX) ...")
+        await page.wait_for_load_state("networkidle", timeout=20_000)
+
+        # Додатково чекаємо появи будь-якого блоку результатів
+        try:
+            await page.wait_for_selector(
+                ".results, #results, .result, tr.even, tr.odd, div[id*='result'], table.resultsT",
+                timeout=10_000,
+            )
+            print("    Знайдено блок результатів!")
+        except Exception:
+            print("    УВАГА: блок результатів не знайдено за відомими селекторами")
 
             # ── 4. Сторінка результатів ──────────────────────────────────
             await page.screenshot(path=str(OUT_DIR / "2_results.png"), full_page=True)
