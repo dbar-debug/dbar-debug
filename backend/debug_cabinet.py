@@ -55,51 +55,75 @@ async def main():
             href = await el.get_attribute("href") or ""
             print(f"    <{tag}> '{text}' href='{href}'")
 
-        # ── 4. Перейти на сторінку авторизації якщо є окремий шлях ──────
-        auth_urls = ["/login", "/auth", "/sign-in", "/enter"]
-        for path in auth_urls:
-            try:
-                resp = await page.goto(f"{CABINET_URL}{path}", wait_until="networkidle", timeout=10_000)
-                if resp and resp.status == 200:
-                    print(f"\n[4] Знайдено сторінку авторизації: {CABINET_URL}{path}")
-                    await page.screenshot(
-                        path=str(OUT_DIR / f"4_cabinet_login{path.replace('/', '_')}.png"),
-                        full_page=True,
-                    )
-                    (OUT_DIR / f"4_cabinet_login{path.replace('/', '_')}.html").write_text(
-                        await page.content(), encoding="utf-8"
-                    )
-
-                    # Iframe на сторінці входу
-                    frames = page.frames
-                    print(f"    Фреймів на цій сторінці: {len(frames)}")
-                    for i, frame in enumerate(frames):
-                        print(f"    [{i}] {frame.url}")
+        # ── 4. Клікнути кнопку "УВІЙТИ" ──────────────────────────────────
+        print("\n[4] Шукаю кнопку 'УВІЙТИ' ...")
+        btn_selectors = [
+            "button", "a.btn", "[class*='login']", "[class*='enter']",
+            "[class*='signin']", "[class*='auth']",
+        ]
+        clicked = False
+        for sel in btn_selectors:
+            els = await page.query_selector_all(sel)
+            for el in els:
+                text = (await el.inner_text()).strip().upper()
+                if any(w in text for w in ["УВІЙТИ", "ВХІД", "ВОЙТИ", "LOGIN", "SIGN IN", "ENTER"]):
+                    print(f"    Клікаю: '{text}' (селектор: {sel})")
+                    await el.click()
+                    clicked = True
                     break
-            except Exception:
-                pass
+            if clicked:
+                break
 
-        # ── 5. Пошук IIT SignWidget (зазвичай iframe від eu.iit.com.ua) ──
-        print("\n[5] Шукаю IIT SignWidget ...")
-        iit_frames = [f for f in page.frames if "iit" in f.url.lower() or "sign" in f.url.lower()]
-        if iit_frames:
-            for f in iit_frames:
-                print(f"    Знайдено IIT frame: {f.url}")
-                inputs = await f.query_selector_all("input, button")
-                for el in inputs:
-                    attrs = {}
-                    for attr in ["type", "id", "class", "placeholder"]:
-                        v = await el.get_attribute(attr)
-                        if v:
-                            attrs[attr] = v
-                    print(f"      {attrs}")
-        else:
-            print("    IIT frame не знайдено на поточній сторінці")
+        if not clicked:
+            print("    Кнопку не знайдено — пробую клікнути перший button")
+            btn = await page.query_selector("button")
+            if btn:
+                await btn.click()
+                clicked = True
+
+        if clicked:
+            print("    Чекаю завантаження widget...")
+            await page.wait_for_load_state("networkidle", timeout=15_000)
+            await asyncio.sleep(3)  # додатковий час для JS
+
+            await page.screenshot(path=str(OUT_DIR / "4_after_login_click.png"), full_page=True)
+            (OUT_DIR / "4_after_login_click.html").write_text(await page.content(), encoding="utf-8")
+            print("    Збережено: debug_output/4_after_login_click.png")
+            print(f"    URL: {page.url}")
+
+        # ── 5. Всі фрейми після кліку ─────────────────────────────────────
+        print(f"\n[5] Фреймів після кліку: {len(page.frames)}")
+        for i, frame in enumerate(page.frames):
+            print(f"    [{i}] url={frame.url}  name={frame.name}")
+
+        # ── 6. Всі input та button на сторінці і в фреймах ───────────────
+        print("\n[6] Input/button елементи (основна сторінка + всі фрейми):")
+        for frame in page.frames:
+            els = await frame.query_selector_all("input, button, [role='button']")
+            if not els:
+                continue
+            print(f"  --- frame: {frame.url[:80]} ---")
+            for el in els:
+                attrs = {}
+                for attr in ["type", "id", "class", "placeholder", "name"]:
+                    v = await el.get_attribute(attr)
+                    if v:
+                        attrs[attr] = v[:50]
+                text = (await el.inner_text()).strip()[:40]
+                if text:
+                    attrs["text"] = text
+                print(f"    {attrs}")
+
+        # ── 7. Всі видимі тексти на сторінці ─────────────────────────────
+        print("\n[7] Видимий текст на сторінці (перші 50 рядків):")
+        body_text = await page.inner_text("body")
+        lines = [l.strip() for l in body_text.splitlines() if l.strip()]
+        for line in lines[:50]:
+            print(f"    {line}")
 
         await browser.close()
 
-    print("\nГотово! Відкрийте debug_output/3_cabinet_home.png")
-    print("та debug_output/4_cabinet_login_*.png")
+    print("\nГотово! Відкрийте debug_output/4_after_login_click.png")
 
 
 asyncio.run(main())
