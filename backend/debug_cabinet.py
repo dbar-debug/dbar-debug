@@ -1,5 +1,5 @@
 """
-Debug script v2: step-by-step inspection of cabinet.court.gov.ua
+Debug script v3: follow the /redirect/au auth flow on cabinet.court.gov.ua
 Run: python3 debug_cabinet.py
 """
 
@@ -10,7 +10,58 @@ from playwright.async_api import async_playwright
 OUT_DIR = Path("debug_output")
 OUT_DIR.mkdir(exist_ok=True)
 
-CABINET_URL = "https://cabinet.court.gov.ua/login"
+AUTH_URL = "https://cabinet.court.gov.ua/redirect/au"
+
+
+async def snapshot(page, name: str):
+    path_png  = str(OUT_DIR / f"{name}.png")
+    path_html = str(OUT_DIR / f"{name}.html")
+    await page.screenshot(path=path_png, full_page=True)
+    (OUT_DIR / f"{name}.html").write_text(await page.content(), encoding="utf-8")
+    print(f"    Збережено: {name}.png  |  URL: {page.url}")
+
+
+async def print_page_info(page, label: str):
+    print(f"\n--- {label} ---")
+    print(f"URL: {page.url}")
+
+    # Текст
+    try:
+        body = await page.inner_text("body")
+        lines = [l.strip() for l in body.splitlines() if l.strip()]
+        print("Текст:")
+        for l in lines[:40]:
+            print(f"  {l}")
+    except Exception:
+        pass
+
+    # Фрейми
+    print(f"Фреймів: {len(page.frames)}")
+    for i, f in enumerate(page.frames):
+        print(f"  [{i}] {f.url}")
+
+    # Всі посилання та кнопки
+    print("Посилання/кнопки:")
+    for frame in page.frames:
+        els = await frame.query_selector_all("a, button, [role='button']")
+        for el in els:
+            text = (await el.inner_text()).strip()[:50]
+            href = await el.get_attribute("href") or ""
+            cls  = await el.get_attribute("class") or ""
+            if text or href:
+                print(f"  text='{text}' href='{href[:60]}' class='{cls[:30]}'")
+
+    # Input-поля
+    print("Input-поля:")
+    for frame in page.frames:
+        inputs = await frame.query_selector_all("input")
+        for inp in inputs:
+            attrs = {}
+            for attr in ["type", "id", "name", "class", "placeholder"]:
+                v = await inp.get_attribute(attr)
+                if v:
+                    attrs[attr] = v[:50]
+            print(f"  {attrs}")
 
 
 async def main():
@@ -25,88 +76,35 @@ async def main():
             locale="uk-UA",
         )
 
-        # ── 1. Відкрити сторінку ─────────────────────────────────────────
-        print(f"[1] Відкриваю {CABINET_URL}")
-        await page.goto(CABINET_URL, wait_until="domcontentloaded", timeout=30_000)
-        await asyncio.sleep(5)  # чекаємо React
+        # ── 1. Перейти напряму на /redirect/au ──────────────────────────
+        print(f"[1] Відкриваю {AUTH_URL}")
+        await page.goto(AUTH_URL, wait_until="domcontentloaded", timeout=30_000)
+        await asyncio.sleep(4)
+        await snapshot(page, "step1_redirect_au")
+        await print_page_info(page, "Після /redirect/au")
 
-        await page.screenshot(path=str(OUT_DIR / "step1_loaded.png"), full_page=True)
-        print(f"    URL: {page.url}")
-        print("    Збережено: step1_loaded.png")
+        # ── 2. Якщо перенаправило — ще один крок ────────────────────────
+        if page.url != AUTH_URL:
+            print(f"\n[2] Перенаправило на: {page.url}")
+            await asyncio.sleep(3)
+            await snapshot(page, "step2_after_redirect")
+            await print_page_info(page, "Після редиректу")
 
-        # ── 2. Всі кнопки ───────────────────────────────────────────────
-        print("\n[2] Всі кнопки на сторінці:")
-        buttons = await page.query_selector_all("button, a, [role='button']")
-        for i, btn in enumerate(buttons):
-            text = (await btn.inner_text()).strip()
-            cls = await btn.get_attribute("class") or ""
-            href = await btn.get_attribute("href") or ""
-            if text or href:
-                print(f"    [{i}] text='{text[:50]}' class='{cls[:40]}' href='{href[:40]}'")
-
-        # ── 3. Весь текст сторінки ───────────────────────────────────────
-        print("\n[3] Весь видимий текст:")
-        try:
-            body = await page.inner_text("body")
-            for line in body.splitlines():
-                line = line.strip()
-                if line:
-                    print(f"    {line}")
-        except Exception as e:
-            print(f"    Помилка: {e}")
-
-        # ── 4. Клікнути перший button ────────────────────────────────────
-        print("\n[4] Клікаю перший button...")
-        try:
-            first_btn = await page.query_selector("button")
-            if first_btn:
-                text = (await first_btn.inner_text()).strip()
-                print(f"    Кнопка: '{text}'")
-                await first_btn.click()
-                await asyncio.sleep(5)
-
-                await page.screenshot(path=str(OUT_DIR / "step4_after_click.png"), full_page=True)
-                (OUT_DIR / "step4_after_click.html").write_text(
-                    await page.content(), encoding="utf-8"
-                )
-                print("    Збережено: step4_after_click.png + .html")
-                print(f"    URL після кліку: {page.url}")
-
-                # Фрейми після кліку
-                print(f"\n[5] Фреймів після кліку: {len(page.frames)}")
-                for i, f in enumerate(page.frames):
-                    print(f"    [{i}] {f.url}")
-
-                # Всі input після кліку
-                print("\n[6] Всі input/button після кліку:")
-                for frame in page.frames:
-                    els = await frame.query_selector_all("input, button")
-                    if els:
-                        print(f"  --- frame: {frame.url[:70]} ---")
-                        for el in els:
-                            attrs = {}
-                            for attr in ["type", "id", "class", "placeholder", "name"]:
-                                v = await el.get_attribute(attr)
-                                if v:
-                                    attrs[attr] = v[:50]
-                            txt = (await el.inner_text()).strip()[:40]
-                            if txt:
-                                attrs["text"] = txt
-                            print(f"      {attrs}")
-
-                print("\n[7] Текст після кліку:")
-                body = await page.inner_text("body")
-                for line in body.splitlines():
-                    line = line.strip()
-                    if line:
-                        print(f"    {line}")
-            else:
-                print("    Жодної кнопки не знайдено!")
-        except Exception as e:
-            print(f"    Помилка при кліку: {e}")
+            # Шукаємо кнопку "КЕП" або "Файловий носій" або "ПриватБанк"
+            print("\n[3] Шукаю варіанти входу (КЕП, ключ, файл):")
+            kw = ["кеп", "ключ", "файл", "приват", "eds", "sign", "token",
+                  "носій", "смарт", "smart", "usb", "mobile", "дія", "diia"]
+            for frame in page.frames:
+                els = await frame.query_selector_all("a, button, div, li, span")
+                for el in els:
+                    text = (await el.inner_text()).strip().lower()
+                    if any(k in text for k in kw) and len(text) < 80:
+                        tag  = await el.evaluate("e => e.tagName")
+                        href = await el.get_attribute("href") or ""
+                        print(f"  <{tag}> '{text}' href='{href}'")
 
         await browser.close()
-    print("\nГотово!")
+    print("\nГотово! Перегляньте скриншоти в debug_output/")
 
 
 asyncio.run(main())
