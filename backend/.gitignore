@@ -1,4 +1,5 @@
 .env
 debug_output/
+sessions/
 __pycache__/
 *.pyc

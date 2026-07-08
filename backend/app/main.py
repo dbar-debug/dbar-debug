@@ -1,7 +1,12 @@
+import os
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.scraper import search_by_name
+from app.cabinet_auth import get_session, clear_session
+from app.cabinet_scraper import get_my_cases
 from app.models import SearchResult
 
 app = FastAPI(
@@ -18,9 +23,58 @@ app.add_middleware(
 )
 
 
+class LoginRequest(BaseModel):
+    kep_file: str   # абсолютний шлях до .jks файлу на сервері
+    password: str
+    ca_name: str = 'КНЕДП АЦСК АТ КБ "ПРИВАТБАНК"'
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.post("/cabinet/login")
+async def cabinet_login(req: LoginRequest):
+    """Авторизація через КЕП. Зберігає сесію на сервері."""
+    try:
+        clear_session()  # примусова свіжа авторизація
+        cookies = await get_session(req.kep_file, req.password, req.ca_name)
+        return {"status": "ok", "cookies_count": len(cookies)}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+
+@app.get("/cabinet/cases")
+async def cabinet_cases():
+    """Повертає особисті судові справи з cabinet.court.gov.ua."""
+    kep_file = os.getenv("KEP_FILE_PATH", "")
+    password = os.getenv("KEP_PASSWORD", "")
+    if not kep_file or not password:
+        raise HTTPException(
+            status_code=400,
+            detail="Встановіть KEP_FILE_PATH та KEP_PASSWORD у .env файлі або викличте /cabinet/login"
+        )
+    try:
+        cookies = await get_session(kep_file, password)
+        result  = await get_my_cases(cookies)
+        return {
+            "total_found": result.total_found,
+            "cases": [
+                {
+                    "case_number":   c.case_number,
+                    "court_name":    c.court_name,
+                    "date":          c.date,
+                    "document_type": c.document_type,
+                    "url":           c.url,
+                }
+                for c in result.cases
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/search", response_model=dict)
