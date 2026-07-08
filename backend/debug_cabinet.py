@@ -1,5 +1,5 @@
 """
-Debug script v3: follow the /redirect/au auth flow on cabinet.court.gov.ua
+Debug script v4: click the <a> "УВІЙТИ" link and follow all redirects.
 Run: python3 debug_cabinet.py
 """
 
@@ -10,57 +10,50 @@ from playwright.async_api import async_playwright
 OUT_DIR = Path("debug_output")
 OUT_DIR.mkdir(exist_ok=True)
 
-AUTH_URL = "https://cabinet.court.gov.ua/redirect/au"
+LOGIN_URL = "https://cabinet.court.gov.ua/login"
 
 
 async def snapshot(page, name: str):
-    path_png  = str(OUT_DIR / f"{name}.png")
-    path_html = str(OUT_DIR / f"{name}.html")
-    await page.screenshot(path=path_png, full_page=True)
+    await page.screenshot(path=str(OUT_DIR / f"{name}.png"), full_page=True)
     (OUT_DIR / f"{name}.html").write_text(await page.content(), encoding="utf-8")
-    print(f"    Збережено: {name}.png  |  URL: {page.url}")
+    print(f"  Збережено: {name}.png  |  URL: {page.url}")
 
 
-async def print_page_info(page, label: str):
-    print(f"\n--- {label} ---")
+async def print_info(page, label: str):
+    print(f"\n=== {label} ===")
     print(f"URL: {page.url}")
 
-    # Текст
+    body = ""
     try:
         body = await page.inner_text("body")
-        lines = [l.strip() for l in body.splitlines() if l.strip()]
-        print("Текст:")
-        for l in lines[:40]:
-            print(f"  {l}")
     except Exception:
         pass
+    lines = [l.strip() for l in body.splitlines() if l.strip()]
+    print(f"Текст ({len(lines)} рядків):")
+    for l in lines[:30]:
+        print(f"  {l}")
 
-    # Фрейми
     print(f"Фреймів: {len(page.frames)}")
     for i, f in enumerate(page.frames):
         print(f"  [{i}] {f.url}")
 
-    # Всі посилання та кнопки
-    print("Посилання/кнопки:")
+    print("Всі <a> та <button>:")
     for frame in page.frames:
-        els = await frame.query_selector_all("a, button, [role='button']")
-        for el in els:
-            text = (await el.inner_text()).strip()[:50]
+        for el in await frame.query_selector_all("a, button"):
+            text = (await el.inner_text()).strip()[:60]
             href = await el.get_attribute("href") or ""
             cls  = await el.get_attribute("class") or ""
             if text or href:
-                print(f"  text='{text}' href='{href[:60]}' class='{cls[:30]}'")
+                print(f"  text='{text}' href='{href[:80]}' cls='{cls[:30]}'")
 
-    # Input-поля
-    print("Input-поля:")
+    print("Всі <input>:")
     for frame in page.frames:
-        inputs = await frame.query_selector_all("input")
-        for inp in inputs:
+        for inp in await frame.query_selector_all("input"):
             attrs = {}
-            for attr in ["type", "id", "name", "class", "placeholder"]:
-                v = await inp.get_attribute(attr)
+            for a in ["type", "id", "name", "placeholder", "class"]:
+                v = await inp.get_attribute(a)
                 if v:
-                    attrs[attr] = v[:50]
+                    attrs[a] = v[:50]
             print(f"  {attrs}")
 
 
@@ -76,35 +69,59 @@ async def main():
             locale="uk-UA",
         )
 
-        # ── 1. Перейти напряму на /redirect/au ──────────────────────────
-        print(f"[1] Відкриваю {AUTH_URL}")
-        await page.goto(AUTH_URL, wait_until="domcontentloaded", timeout=30_000)
-        await asyncio.sleep(4)
-        await snapshot(page, "step1_redirect_au")
-        await print_page_info(page, "Після /redirect/au")
+        # Логувати всі навігації
+        page.on("framenavigated", lambda f: print(f"  >> навігація: {f.url}"))
 
-        # ── 2. Якщо перенаправило — ще один крок ────────────────────────
-        if page.url != AUTH_URL:
-            print(f"\n[2] Перенаправило на: {page.url}")
+        # ── 1. Відкрити сторінку входу ───────────────────────────────────
+        print(f"[1] Відкриваю {LOGIN_URL}")
+        await page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30_000)
+        await asyncio.sleep(3)
+        await snapshot(page, "s1_login")
+
+        # ── 2. Знайти і клікнути <a> з текстом УВІЙТИ ───────────────────
+        print("\n[2] Шукаю посилання УВІЙТИ...")
+        link = None
+        for el in await page.query_selector_all("a"):
+            text = (await el.inner_text()).strip().upper()
+            if "УВІЙТИ" in text or "ВОЙТИ" in text or "LOGIN" in text.upper():
+                link = el
+                print(f"  Знайдено: '{text}'  href='{await el.get_attribute('href')}'")
+                break
+
+        if not link:
+            # Запасний варіант — перший видимий елемент з href
+            print("  Не знайдено по тексту, клікаю перший <a> з href...")
+            for el in await page.query_selector_all("a[href]"):
+                href = await el.get_attribute("href") or ""
+                if href and href != "#" and "tel:" not in href:
+                    link = el
+                    print(f"  href='{href}'")
+                    break
+
+        if link:
+            print("\n[3] Клікаю посилання і стежу за редиректами...")
+            await link.click()
+            # Чекаємо до 15 секунд поки сторінка стабілізується
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15_000)
+            except Exception:
+                pass
             await asyncio.sleep(3)
-            await snapshot(page, "step2_after_redirect")
-            await print_page_info(page, "Після редиректу")
+            await snapshot(page, "s2_after_click")
+            await print_info(page, "Після кліку УВІЙТИ")
 
-            # Шукаємо кнопку "КЕП" або "Файловий носій" або "ПриватБанк"
-            print("\n[3] Шукаю варіанти входу (КЕП, ключ, файл):")
-            kw = ["кеп", "ключ", "файл", "приват", "eds", "sign", "token",
-                  "носій", "смарт", "smart", "usb", "mobile", "дія", "diia"]
-            for frame in page.frames:
-                els = await frame.query_selector_all("a, button, div, li, span")
-                for el in els:
-                    text = (await el.inner_text()).strip().lower()
-                    if any(k in text for k in kw) and len(text) < 80:
-                        tag  = await el.evaluate("e => e.tagName")
-                        href = await el.get_attribute("href") or ""
-                        print(f"  <{tag}> '{text}' href='{href}'")
+            # ── 4. Якщо відкрилась нова сторінка ─────────────────────────
+            current_url = page.url
+            if "court.gov.ua" not in current_url:
+                print(f"\n[4] Перейшли на зовнішній сервіс: {current_url}")
+                await asyncio.sleep(3)
+                await snapshot(page, "s3_external_auth")
+                await print_info(page, "Зовнішній сервіс авторизації")
+        else:
+            print("  Жодного посилання не знайдено!")
 
         await browser.close()
-    print("\nГотово! Перегляньте скриншоти в debug_output/")
+    print("\nГотово!")
 
 
 asyncio.run(main())
