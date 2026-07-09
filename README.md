@@ -51,21 +51,47 @@ python -m app.scraper "Іваненко Іван Іванович"
 curl "http://localhost:8000/search?name=Іваненко%20Іван%20Іванович"
 ```
 
+## Особистий кабінет (КЕП-авторизація)
+
+```bash
+curl -s http://localhost:8000/cabinet/cases | python3 -m json.tool
+```
+
+Потребує `.env` з `KEP_FILE_PATH` і `KEP_PASSWORD` (див.
+`backend/.env.example`). Авторизація через `id.gov.ua` (файловий носій,
+напр. ПриватБанк) виконується автоматично при першому запиті і кешується на
+4 години. Дані справ отримуються напряму з внутрішнього JSON API
+`cabinet.court.gov.ua/api/cases/my` — без HTML-скрапінгу.
+
+## Мобільний додаток
+
+Flutter-клієнт для iPhone/Android/Web — див. `mobile/README.md`.
+
 ## Структура проєкту
 
 ```
 backend/
 ├── app/
-│   ├── main.py       # FastAPI маршрути
-│   ├── scraper.py    # Playwright-скрапер реєстру
-│   └── models.py     # Моделі даних
+│   ├── main.py            # FastAPI маршрути
+│   ├── scraper.py         # Playwright-скрапер публічного реєстру
+│   ├── cabinet_auth.py    # КЕП-авторизація через id.gov.ua
+│   ├── cabinet_scraper.py # Отримання "Моїх справ" через внутрішній API
+│   └── models.py          # Моделі даних
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
+
+mobile/
+├── lib/
+│   ├── main.dart
+│   ├── models/court_case.dart
+│   ├── services/api_service.dart
+│   └── screens/           # Мої справи, Пошук, Налаштування
+└── pubspec.yaml
 ```
 
 ## Наступні кроки
 
-- [ ] Фаза 2: Авторизація через КЕП / Дія (cabinet.court.gov.ua)
-- [ ] Фаза 3: Flutter-додаток для iPhone
+- [x] Фаза 2: Авторизація через КЕП (cabinet.court.gov.ua)
+- [ ] Фаза 3: Flutter-додаток для iPhone (базовий UI готовий, потребує збірки під iOS)
 - [ ] Фаза 4: HTTPS через Nginx + Let's Encrypt на домашньому сервері
