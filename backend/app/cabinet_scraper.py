@@ -1,91 +1,96 @@
 """
-Scraper for cabinet.court.gov.ua — personal court cases.
+Fetches personal court cases from cabinet.court.gov.ua via its internal
+JSON API (discovered by capturing the SPA's own XHR calls — see
+debug_cabinet_cases.py). No HTML scraping needed: cabinet.court.gov.ua
+is a React app, and "Мої справи" loads from GET /api/cases/my.
+
 Requires an authenticated session from cabinet_auth.py.
 """
 
-import asyncio
 from typing import List
 
 from playwright.async_api import async_playwright
 
-from app.cabinet_auth import apply_session
 from app.models import CourtCase, SearchResult
 
-CABINET_URL  = "https://cabinet.court.gov.ua"
-CASES_PATH   = "/cases"       # adjust after inspecting the logged-in page
+CABINET_URL = "https://cabinet.court.gov.ua"
 
 
 async def get_my_cases(session: dict) -> SearchResult:
     """
-    Fetch personal court cases from cabinet.court.gov.ua.
-    `session` — dict returned by cabinet_auth.get_session()/authenticate()
+    Fetch personal court cases from cabinet.court.gov.ua's internal API.
+    `session` — dict returned by cabinet_auth.get_session()/authenticate(),
+    i.e. {"cookies": [...], "local_storage": {...}, "session_storage": {...}}
     """
-    cases: List[CourtCase] = []
+    cookies = session.get("cookies") or []
+    token = (session.get("local_storage") or {}).get("token", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            locale="uk-UA",
+        # Лише HTTP-запити — не потрібен headless Chromium, лише cookies
+        # + Bearer token, які вже отримані під час КЕП-автентифікації.
+        api = await pw.request.new_context(
+            storage_state={"cookies": cookies, "origins": []},
+            extra_http_headers=headers,
         )
-        # Inject saved cookies + localStorage so we are authenticated
-        await apply_session(context, session)
 
-        page = await context.new_page()
+        try:
+            my_user_id = await _get_my_user_id(api)
+            courts = await _get_dictionary(api, "/api/dictionaries/courts", key="name")
+            roles = await _get_dictionary(api, "/api/dictionaries/cases/member_roles", key="description")
+            raw_cases = await _get_my_cases_raw(api)
+        finally:
+            await api.dispose()
 
-        print(f"[cabinet] Відкриваю {CABINET_URL}{CASES_PATH} ...")
-        await page.goto(f"{CABINET_URL}{CASES_PATH}", wait_until="networkidle", timeout=30_000)
-        await asyncio.sleep(2)
-
-        # Debug: save screenshot of the cases page
-        await page.screenshot(path="debug_output/cabinet_cases.png", full_page=True)
-
-        # Parse cases (selectors will be updated after seeing the real page)
-        cases = await _parse_cases(page)
-
-        await browser.close()
+    cases = [_to_court_case(rc, my_user_id, courts, roles) for rc in raw_cases]
+    print(f"[cabinet] Знайдено {len(cases)} справ")
 
     return SearchResult(query="cabinet", total_found=len(cases), cases=cases)
 
 
-async def _parse_cases(page) -> List[CourtCase]:
-    """Parse the list of personal cases. Selectors TBD after first login."""
-    cases = []
+async def _get_my_user_id(api) -> str:
+    resp = await api.get(f"{CABINET_URL}/api/auth/me")
+    data = (await resp.json())["data"]
+    return data["userId"]
 
-    # Try common table/list patterns
-    rows = await page.query_selector_all("tr.case-row, tr.odd, tr.even, .case-item, li.case")
-    if not rows:
-        # Fallback — try any table rows with links
-        rows = await page.query_selector_all("tbody tr")
 
-    for row in rows:
-        try:
-            link_el = await row.query_selector("a[href*='case'], a[href*='Case']")
-            if not link_el:
-                continue
+async def _get_dictionary(api, path: str, key: str) -> dict:
+    resp = await api.get(f"{CABINET_URL}{path}")
+    items = (await resp.json())["data"]
+    return {item["id"]: item[key] for item in items}
 
-            href = await link_el.get_attribute("href") or ""
-            url  = href if href.startswith("http") else f"{CABINET_URL}{href}"
 
-            tds = await row.query_selector_all("td")
-            case_number = (await tds[0].inner_text()).strip() if len(tds) > 0 else "—"
-            court_name  = (await tds[1].inner_text()).strip() if len(tds) > 1 else "—"
-            date        = (await tds[2].inner_text()).strip() if len(tds) > 2 else "—"
-            doc_type    = (await tds[3].inner_text()).strip() if len(tds) > 3 else "—"
+async def _get_my_cases_raw(api) -> List[dict]:
+    all_cases: List[dict] = []
+    start = 0
+    page_size = 200
+    while True:
+        resp = await api.get(
+            f"{CABINET_URL}/api/cases/my",
+            params={"start": start, "count": page_size, "is_not_deleted": 1},
+        )
+        page = (await resp.json())["data"]
+        all_cases.extend(page)
+        if len(page) < page_size:
+            break
+        start += page_size
+    return all_cases
 
-            cases.append(CourtCase(
-                case_number=case_number,
-                court_name=court_name,
-                date=date,
-                document_type=doc_type,
-                url=url,
-            ))
-        except Exception as e:
-            print(f"[cabinet] Помилка парсингу рядка: {e}")
 
-    print(f"[cabinet] Знайдено {len(cases)} справ")
-    return cases
+def _to_court_case(raw: dict, my_user_id: str, courts: dict, roles: dict) -> CourtCase:
+    my_member = next(
+        (m for m in raw.get("caseMembers", []) if m.get("userId") == my_user_id),
+        None,
+    )
+    my_role = roles.get(my_member["roleId"], "—") if my_member else "—"
+
+    date = raw.get("docDateLast") or raw.get("docDateFirst") or ""
+    date = date[:10] if date else "—"  # YYYY-MM-DD
+
+    return CourtCase(
+        case_number=raw.get("number", "—"),
+        court_name=courts.get(raw.get("courtId"), "—"),
+        date=date,
+        document_type=my_role,
+        url=f"{CABINET_URL}/cases/{raw.get('id', '')}",
+    )
