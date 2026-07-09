@@ -1,6 +1,6 @@
 """
 Scraper for cabinet.court.gov.ua — personal court cases.
-Requires authenticated session cookies from cabinet_auth.py.
+Requires an authenticated session from cabinet_auth.py.
 """
 
 import asyncio
@@ -8,16 +8,17 @@ from typing import List
 
 from playwright.async_api import async_playwright
 
+from app.cabinet_auth import apply_session
 from app.models import CourtCase, SearchResult
 
 CABINET_URL  = "https://cabinet.court.gov.ua"
 CASES_PATH   = "/cases"       # adjust after inspecting the logged-in page
 
 
-async def get_my_cases(cookies: list) -> SearchResult:
+async def get_my_cases(session: dict) -> SearchResult:
     """
     Fetch personal court cases from cabinet.court.gov.ua.
-    `cookies` — list returned by cabinet_auth.authenticate()
+    `session` — dict returned by cabinet_auth.get_session()/authenticate()
     """
     cases: List[CourtCase] = []
 
@@ -31,8 +32,8 @@ async def get_my_cases(cookies: list) -> SearchResult:
             ),
             locale="uk-UA",
         )
-        # Inject saved cookies so we are authenticated
-        await context.add_cookies(cookies)
+        # Inject saved cookies + localStorage so we are authenticated
+        await apply_session(context, session)
 
         page = await context.new_page()
 

@@ -8,6 +8,12 @@ Flow:
     → id.gov.ua/euid-auth-js  (click "Файловий носій")
     → upload .jks + password + click "Продовжити"
     → redirect back to cabinet.court.gov.ua with session cookies
+
+Важливо: cabinet.court.gov.ua — React SPA, і частина сесії (OAuth-токени)
+зберігається не в cookies, а в localStorage. Тому session — це не просто
+список cookies, а {"cookies": [...], "local_storage": {...}}, і при
+повторному використанні сесії в новому браузерному контексті треба
+відновити ОБИДВІ частини (див. apply_session()).
 """
 
 import asyncio
@@ -28,22 +34,47 @@ SESSION_TTL   = 3600 * 4   # 4 hours — re-auth after this
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-async def get_session(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -> list:
+async def get_session(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -> dict:
     """
-    Return valid session cookies for cabinet.court.gov.ua.
+    Return valid session {"cookies": [...], "local_storage": {...}} for cabinet.court.gov.ua.
     Uses cached session if still fresh; otherwise re-authenticates.
     """
     cached = _load_session()
     if cached:
         return cached
-    cookies = await authenticate(kep_file, password, ca_name)
-    _save_session(cookies)
-    return cookies
+    session = await authenticate(kep_file, password, ca_name)
+    _save_session(session)
+    return session
 
 
-async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -> list:
+async def apply_session(context, session: dict):
     """
-    Full authentication flow. Returns list of cookie dicts.
+    Inject a previously captured session (cookies + localStorage) into a
+    fresh browser context, BEFORE navigating to cabinet.court.gov.ua.
+    localStorage can only be set once we're on the right origin, so we use
+    an init script that runs before the page's own JS on every navigation.
+    """
+    cookies = session.get("cookies") or []
+    if cookies:
+        await context.add_cookies(cookies)
+
+    local_storage = session.get("local_storage") or {}
+    session_storage = session.get("session_storage") or {}
+    if local_storage or session_storage:
+        init_script = f"""
+        (() => {{
+            const ls = {json.dumps(local_storage)};
+            for (const k in ls) {{ try {{ window.localStorage.setItem(k, ls[k]); }} catch (e) {{}} }}
+            const ss = {json.dumps(session_storage)};
+            for (const k in ss) {{ try {{ window.sessionStorage.setItem(k, ss[k]); }} catch (e) {{}} }}
+        }})();
+        """
+        await context.add_init_script(init_script)
+
+
+async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -> dict:
+    """
+    Full authentication flow. Returns {"cookies": [...], "local_storage": {...}}.
     Raises RuntimeError on failure.
     """
     kep_path = Path(kep_file)
@@ -161,16 +192,31 @@ async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -
                 err = await _get_error_text(page)
                 raise RuntimeError(f"Авторизація не завершилась. {err}")
 
-            # Дочекатись поки SPA довантажить дані і остаточно виставить сесійні cookies
+            # Дочекатись поки SPA довантажить дані і остаточно виставить сесію
+            # (JWT-токени зазвичай пишуться в localStorage вже після цього).
             await page.wait_for_load_state("networkidle", timeout=15_000)
             await asyncio.sleep(2)
 
             print(f"[auth] Авторизовано! URL: {page.url}")
 
-            # ── Step 9: Зберегти cookies ──────────────────────────────────
+            # ── Step 9: Зберегти cookies + localStorage/sessionStorage ──────
             cookies = await context.cookies()
-            print(f"[auth] Отримано {len(cookies)} cookies")
-            return cookies
+            local_storage = json.loads(
+                await page.evaluate("() => JSON.stringify(window.localStorage)")
+            )
+            session_storage = json.loads(
+                await page.evaluate("() => JSON.stringify(window.sessionStorage)")
+            )
+            print(
+                f"[auth] Отримано {len(cookies)} cookies, "
+                f"{len(local_storage)} ключів localStorage, "
+                f"{len(session_storage)} ключів sessionStorage"
+            )
+            return {
+                "cookies": cookies,
+                "local_storage": local_storage,
+                "session_storage": session_storage,
+            }
 
         finally:
             await browser.close()
@@ -223,8 +269,8 @@ async def _get_error_text(page) -> str:
     return ""
 
 
-def _load_session() -> Optional[list]:
-    """Load cached session cookies if they are still fresh."""
+def _load_session() -> Optional[dict]:
+    """Load cached session if it is still fresh."""
     if not SESSION_FILE.exists():
         return None
     try:
@@ -232,14 +278,27 @@ def _load_session() -> Optional[list]:
         if time.time() - data.get("saved_at", 0) > SESSION_TTL:
             print("[auth] Сесія застаріла, потрібна повторна авторизація")
             return None
-        return data["cookies"]
+        return {
+            "cookies": data.get("cookies", []),
+            "local_storage": data.get("local_storage", {}),
+            "session_storage": data.get("session_storage", {}),
+        }
     except Exception:
         return None
 
 
-def _save_session(cookies: list):
+def _save_session(session: dict):
     SESSION_FILE.write_text(
-        json.dumps({"saved_at": time.time(), "cookies": cookies}, ensure_ascii=False, indent=2)
+        json.dumps(
+            {
+                "saved_at": time.time(),
+                "cookies": session.get("cookies", []),
+                "local_storage": session.get("local_storage", {}),
+                "session_storage": session.get("session_storage", {}),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
     )
     print(f"[auth] Сесію збережено: {SESSION_FILE}")
 

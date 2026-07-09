@@ -8,7 +8,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from app.cabinet_auth import get_session, clear_session
+from app.cabinet_auth import get_session, clear_session, apply_session
 
 OUT = Path("debug_output")
 OUT.mkdir(exist_ok=True)
@@ -34,8 +34,11 @@ async def main():
 
     print("[1] Авторизуюсь через КЕП (примусово свіжа сесія)...")
     clear_session()  # під час дебагу завжди логінимось заново, кеш може бути невалідний
-    cookies = await get_session(kep_file, password)
-    print(f"[OK] Отримано {len(cookies)} cookies\n")
+    session = await get_session(kep_file, password)
+    print(
+        f"[OK] Отримано {len(session['cookies'])} cookies, "
+        f"{len(session['local_storage'])} ключів localStorage\n"
+    )
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
@@ -48,12 +51,17 @@ async def main():
             locale="uk-UA",
             viewport={"width": 1280, "height": 900},
         )
-        await context.add_cookies(cookies)
+        await apply_session(context, session)
         page = await context.new_page()
 
         print("[2] Відкриваю cabinet.court.gov.ua/ ...")
         await page.goto("https://cabinet.court.gov.ua/", wait_until="networkidle", timeout=30_000)
         await asyncio.sleep(2)
+
+        # Діагностика: чи справді localStorage застосувався в цьому контексті
+        actual_ls_keys = await page.evaluate("() => Object.keys(window.localStorage)")
+        print(f"  [diag] Ключі localStorage на сторінці зараз: {actual_ls_keys}")
+
         await snap(page, "1_home")
 
         print("\n[3] Шукаю посилання 'Мої справи' ...")

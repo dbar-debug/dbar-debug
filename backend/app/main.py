@@ -39,8 +39,8 @@ async def cabinet_login(req: LoginRequest):
     """Авторизація через КЕП. Зберігає сесію на сервері."""
     try:
         clear_session()  # примусова свіжа авторизація
-        cookies = await get_session(req.kep_file, req.password, req.ca_name)
-        return {"status": "ok", "cookies_count": len(cookies)}
+        session = await get_session(req.kep_file, req.password, req.ca_name)
+        return {"status": "ok", "cookies_count": len(session["cookies"])}
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
@@ -58,8 +58,8 @@ async def cabinet_cases():
             detail="Встановіть KEP_FILE_PATH та KEP_PASSWORD у .env файлі або викличте /cabinet/login"
         )
     try:
-        cookies = await get_session(kep_file, password)
-        result  = await get_my_cases(cookies)
+        session = await get_session(kep_file, password)
+        result  = await get_my_cases(session)
         return {
             "total_found": result.total_found,
             "cases": [
