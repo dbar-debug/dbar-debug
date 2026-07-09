@@ -110,6 +110,13 @@ async def _parse_results_page(page) -> List[CourtCase]:
     """Extract CourtCase objects from the current results page."""
     cases = []
     items = await page.query_selector_all(RESULT_ITEM_SELECTOR)
+
+    # Запасний шлях: якщо звичні рядки не знайдено, орієнтуємось на
+    # посилання /Review/<id> — це надійна ознака результату, незалежно
+    # від того, які класи має рядок таблиці.
+    if not items:
+        return await _parse_by_review_links(page)
+
     for item in items:
         try:
             case = await _extract_case(item)
@@ -117,6 +124,50 @@ async def _parse_results_page(page) -> List[CourtCase]:
                 cases.append(case)
         except Exception as e:
             print(f"[scraper] Skipping item due to error: {e}")
+
+    if not cases:
+        cases = await _parse_by_review_links(page)
+    return cases
+
+
+async def _parse_by_review_links(page) -> List[CourtCase]:
+    """Парсити результати від посилань /Review/<id> (стійко до зміни верстки)."""
+    cases = []
+    links = await page.query_selector_all("a[href*='/Review/']")
+    seen = set()
+    for link in links:
+        try:
+            href = await link.get_attribute("href") or ""
+            if not href or href in seen:
+                continue
+            seen.add(href)
+            url = href if href.startswith("http") else f"{REGISTRY_URL}{href}"
+            doc_type = (await link.inner_text() or "").strip() or "Рішення"
+
+            # Піднімаємось до рядка/контейнера, беремо його текст для метаданих
+            row = await link.evaluate_handle("el => el.closest('tr') || el.parentElement")
+            row_text = ""
+            if row:
+                try:
+                    row_text = (await row.evaluate("el => el.innerText")) or ""
+                except Exception:
+                    row_text = ""
+
+            # Дата у форматі dd.mm.yyyy, номер справи типу 754/8443/26
+            date_match = re.search(r"\d{2}\.\d{2}\.\d{4}", row_text)
+            case_match = re.search(r"\d+/\d+/\d+", row_text)
+
+            cases.append(CourtCase(
+                case_number=case_match.group(0) if case_match else "—",
+                court_name="—",
+                date=date_match.group(0) if date_match else "—",
+                document_type=doc_type,
+                url=url,
+                excerpt=" ".join(row_text.split())[:200],
+            ))
+        except Exception as e:
+            print(f"[scraper] Review-link parse error: {e}")
+    print(f"[scraper] Парсинг за /Review/: {len(cases)} результатів")
     return cases
 
 
