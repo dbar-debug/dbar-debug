@@ -118,20 +118,24 @@ async def main():
 
         await page.screenshot(path=str(OUT / "case_detail.png"), full_page=True)
         (OUT / "case_detail.html").write_text(await page.content(), encoding="utf-8")
-        print(f"\n[3] Поточний URL: {page.url}")
+        print(f"\n[3] Модалка 'Інформація про справу' відкрита (URL: {page.url})")
 
-        # Спробувати відкрити вкладки всередині деталей (Засідання/Документи/Провадження)
-        for text in ["Засідання", "Судові засідання", "Документи", "Провадження", "Історія"]:
-            tab = await page.query_selector(f"text={text}")
-            if tab:
-                print(f"  Знайдено вкладку/елемент '{text}' — клікаю...")
-                try:
-                    await tab.click()
-                    await asyncio.sleep(3)
-                except Exception as e:
-                    print(f"    (не вдалося клікнути: {e})")
+        # У модалці є кнопка "ДОКУМЕНТИ ПО СПРАВІ" — саме вона, найімовірніше,
+        # веде на список документів (ухвали, повістки з датами засідань).
+        docs_btn = await page.query_selector("text=ДОКУМЕНТИ ПО СПРАВІ")
+        if not docs_btn:
+            docs_btn = await page.query_selector("text=Документи по справі")
+        if docs_btn:
+            print("[4] Натискаю 'ДОКУМЕНТИ ПО СПРАВІ'...")
+            await docs_btn.click()
+            await page.wait_for_load_state("networkidle", timeout=20_000)
+            await asyncio.sleep(4)
+            print(f"    Після кліку URL: {page.url}")
+            await page.screenshot(path=str(OUT / "case_documents.png"), full_page=True)
+            (OUT / "case_documents.html").write_text(await page.content(), encoding="utf-8")
+        else:
+            print("[4] Кнопку 'ДОКУМЕНТИ ПО СПРАВІ' не знайдено")
 
-        await page.screenshot(path=str(OUT / "case_detail_tabs.png"), full_page=True)
         await browser.close()
 
     (OUT / "case_detail_api_calls.json").write_text(

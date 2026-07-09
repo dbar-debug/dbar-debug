@@ -52,6 +52,8 @@ class _CaseDetailSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _DetailRow(icon: Icons.account_balance, label: 'Суд', value: courtCase.courtName),
+                if (courtCase.proceedingNumber.isNotEmpty)
+                  _DetailRow(icon: Icons.tag, label: 'Провадження', value: courtCase.proceedingNumber),
                 _DetailRow(icon: Icons.calendar_today, label: 'Дата', value: courtCase.date),
                 if (courtCase.subtitle.isNotEmpty && courtCase.subtitle != '—')
                   _DetailRow(icon: Icons.person_outline, label: 'Моя роль', value: courtCase.subtitle),

@@ -111,6 +111,14 @@ def _to_court_case(
         ", ".join(dict.fromkeys(j.name for j in judges)) or "—"
     )
 
+    # Номер провадження (procNumber) лежить у caseJudges, напр. "2/754/9750/26"
+    proc_numbers = [
+        j.get("procNumber", "")
+        for j in raw.get("caseJudges") or []
+        if j.get("procNumber")
+    ]
+    proceeding_number = ", ".join(dict.fromkeys(proc_numbers)) if proc_numbers else ""
+
     return CourtCase(
         case_number=raw.get("number", "—"),
         court_name=courts.get(raw.get("courtId"), "—"),
@@ -121,6 +129,7 @@ def _to_court_case(
         judge=judge_summary,
         created_at=(raw.get("createdAt") or "")[:10],
         updated_at=(raw.get("updatedAt") or "")[:10],
+        proceeding_number=proceeding_number,
         members=members,
         judges=judges,
     )

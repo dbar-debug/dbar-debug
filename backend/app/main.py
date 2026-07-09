@@ -73,6 +73,7 @@ async def cabinet_cases():
                     "url":         c.url,
                     "created_at":  c.created_at,
                     "updated_at":  c.updated_at,
+                    "proceeding_number": c.proceeding_number,
                     "members": [
                         {"name": m.name, "role": m.role} for m in c.members
                     ],

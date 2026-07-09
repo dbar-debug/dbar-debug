@@ -23,6 +23,7 @@ class CourtCase {
   final String judge; // тільки для кабінету
   final String createdAt;
   final String updatedAt;
+  final String proceedingNumber;
   final List<CaseParticipant> members;
   final List<CaseParticipant> judges;
 
@@ -37,6 +38,7 @@ class CourtCase {
     this.judge = '',
     this.createdAt = '',
     this.updatedAt = '',
+    this.proceedingNumber = '',
     this.members = const [],
     this.judges = const [],
   });
@@ -63,6 +65,7 @@ class CourtCase {
       judge: json['judge'] as String? ?? '',
       createdAt: json['created_at'] as String? ?? '',
       updatedAt: json['updated_at'] as String? ?? '',
+      proceedingNumber: json['proceeding_number'] as String? ?? '',
       members: (json['members'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>()
           .map(CaseParticipant.fromJson)

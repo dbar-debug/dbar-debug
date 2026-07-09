@@ -26,6 +26,7 @@ class CourtCase:
     judge: str = ""
     created_at: str = ""
     updated_at: str = ""
+    proceeding_number: str = ""
     members: List[CaseMember] = field(default_factory=list)
     judges: List[CaseJudge] = field(default_factory=list)
 
