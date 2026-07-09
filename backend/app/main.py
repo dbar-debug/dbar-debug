@@ -64,11 +64,11 @@ async def cabinet_cases():
             "total_found": result.total_found,
             "cases": [
                 {
-                    "case_number":   c.case_number,
-                    "court_name":    c.court_name,
-                    "date":          c.date,
-                    "document_type": c.document_type,
-                    "url":           c.url,
+                    "case_number": c.case_number,
+                    "court_name":  c.court_name,
+                    "date":        c.date,
+                    "my_role":     c.document_type,
+                    "url":         c.url,
                 }
                 for c in result.cases
             ],
