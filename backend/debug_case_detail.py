@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 from app.cabinet_auth import get_session, clear_session, apply_session
 
@@ -82,14 +82,15 @@ async def main():
         if not case_id:
             print("[2] case_id не вказано — відкриваю список справ, щоб взяти перший...")
             await page.goto("https://cabinet.court.gov.ua/cases", wait_until="networkidle", timeout=30_000)
-            await asyncio.sleep(2)
-            link = await page.query_selector("tbody tr[id^='cases-row'] a, tbody tr[id^='cases-row']")
-            if link:
-                href = await link.get_attribute("href")
-                print(f"  Клікаю на перший рядок (href={href})")
-                await link.click()
+            try:
+                row = await page.wait_for_selector("tr[id^='cases-row-0']", timeout=15_000)
+            except PWTimeout:
+                row = None
+            if row:
+                print("  Клікаю на перший рядок таблиці...")
+                await row.click()
             else:
-                print("  ПОМИЛКА: не знайшов рядків у таблиці справ")
+                print("  ПОМИЛКА: не знайшов рядків у таблиці справ за 15с")
                 await browser.close()
                 return
         else:
