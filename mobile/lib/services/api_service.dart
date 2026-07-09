@@ -74,6 +74,13 @@ class ApiService {
     return docs;
   }
 
+  /// URL файлу документа (HTML рішення / PDF). Бекенд проксіює його з
+  /// авторизацією, тож цей URL можна відкрити прямо в браузері.
+  Future<Uri> documentFileUrl(String docId) async {
+    final base = await getBaseUrl();
+    return Uri.parse('$base/cabinet/documents/$docId/file');
+  }
+
   Map<String, dynamic> _decodeOrThrow(http.Response response) {
     Map<String, dynamic> body;
     try {

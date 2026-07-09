@@ -186,6 +186,32 @@ async def get_case_documents(session: dict, case_id: str) -> List[CaseDocument]:
     return documents
 
 
+async def get_document_file(session: dict, doc_id: str) -> tuple[bytes, str]:
+    """
+    Повертає (вміст_файлу, content_type) документа через
+    /api/documents/{doc_id}/scan_file. Файл може бути HTML (текст
+    рішення) або PDF — content_type беремо з відповіді суду.
+    """
+    cookies = session.get("cookies") or []
+    token = (session.get("local_storage") or {}).get("token", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    async with async_playwright() as pw:
+        api = await pw.request.new_context(
+            storage_state={"cookies": cookies, "origins": []},
+            extra_http_headers=headers,
+        )
+        try:
+            resp = await api.get(f"{CABINET_URL}/api/documents/{doc_id}/scan_file")
+            body = await resp.body()
+            content_type = resp.headers.get("content-type", "application/octet-stream")
+        finally:
+            await api.dispose()
+
+    print(f"[cabinet] Документ {doc_id}: {len(body)} байт, {content_type}")
+    return body, content_type
+
+
 def _extract_members(raw: dict, member_roles: dict) -> List[CaseMember]:
     seen = set()
     members: List[CaseMember] = []

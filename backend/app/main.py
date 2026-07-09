@@ -1,13 +1,15 @@
 import os
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.scraper import search_by_name
 from app.cabinet_auth import get_session, clear_session
-from app.cabinet_scraper import get_my_cases, get_case_documents
+from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file
 from app.models import SearchResult
+
+CABINET_URL = "https://cabinet.court.gov.ua"
 
 app = FastAPI(
     title="Court Cases API",
@@ -114,6 +116,34 @@ async def cabinet_case_documents(case_id: str):
                 for d in docs
             ],
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/cabinet/documents/{doc_id}/file")
+async def cabinet_document_file(doc_id: str):
+    """
+    Проксіює файл документа з cabinet.court.gov.ua (рішення/ухвала —
+    HTML або PDF). Авторизація (Bearer/cookies) додається на сервері,
+    тож клієнт може відкрити цей URL напряму без облікових даних.
+    """
+    kep_file = os.getenv("KEP_FILE_PATH", "")
+    password = os.getenv("KEP_PASSWORD", "")
+    if not kep_file or not password:
+        raise HTTPException(status_code=400, detail="Встановіть KEP_FILE_PATH та KEP_PASSWORD у .env")
+    try:
+        session = await get_session(kep_file, password)
+        body, content_type = await get_document_file(session, doc_id)
+
+        # Для HTML-рішень переписуємо відносні посилання (герб, стилі),
+        # щоб вони вантажились із cabinet.court.gov.ua, а не з нашого хоста.
+        if "html" in content_type.lower():
+            html = body.decode("utf-8", errors="replace")
+            if "<base" not in html.lower():
+                html = html.replace("<head>", f'<head><base href="{CABINET_URL}/">', 1)
+            body = html.encode("utf-8")
+
+        return Response(content=body, media_type=content_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

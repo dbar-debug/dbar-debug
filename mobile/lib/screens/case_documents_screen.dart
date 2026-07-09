@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/court_case.dart';
 import '../services/api_service.dart';
@@ -82,13 +83,37 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
           leading: Icon(_iconFor(d.description), color: Theme.of(context).colorScheme.primary),
           title: Text(d.description),
           subtitle: Text('№ ${d.number}'),
-          trailing: Text(
-            d.date,
-            style: Theme.of(context).textTheme.bodySmall,
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(d.date, style: Theme.of(context).textTheme.bodySmall),
+              if (d.docId.isNotEmpty)
+                const Icon(Icons.chevron_right, size: 18),
+            ],
           ),
+          onTap: d.docId.isEmpty ? null : () => _openDocument(d),
         );
       },
     );
+  }
+
+  Future<void> _openDocument(CaseDocument d) async {
+    try {
+      final uri = await _api.documentFileUrl(d.docId);
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не вдалося відкрити документ')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Помилка: $e')),
+        );
+      }
+    }
   }
 
   IconData _iconFor(String description) {
