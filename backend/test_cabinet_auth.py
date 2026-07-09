@@ -190,13 +190,18 @@ async def main():
 
         # ── 5. Завантажити файл ──────────────────────────────────────────
         print(f"\n[5] Завантажую файл: {Path(kep_file).name}")
-        file_input = await wait_and_log(page, "#PKeyFileInput", "#PKeyFileInput", timeout=8_000)
-        if file_input:
+        # #PKeyFileInput захований CSS (за drag-drop зоною) — state="attached" замість "visible"
+        try:
+            file_input = await page.wait_for_selector(
+                "#PKeyFileInput", state="attached", timeout=8_000
+            )
+            print("  [OK] #PKeyFileInput знайдено в DOM (прихований елемент)")
             await file_input.set_input_files(kep_file)
-            await asyncio.sleep(4)
+            print("  [OK] Файл передано input-у")
+            await asyncio.sleep(5)   # JS-бібліотека читає і розбирає JKS
             await snap(page, "5_file_uploaded")
-        else:
-            print("  ПОМИЛКА: поле для файлу не знайдено!")
+        except PWTimeout:
+            print("  ПОМИЛКА: #PKeyFileInput не знайдено навіть як прихований!")
             await snap(page, "5_no_file_input")
 
         # ── 6. Ввести пароль ─────────────────────────────────────────────

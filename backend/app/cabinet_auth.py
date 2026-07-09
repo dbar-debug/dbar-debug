@@ -105,11 +105,15 @@ async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -
 
             # ── Step 6: Завантажити файл ключа ───────────────────────────
             print(f"[auth] Завантажую КЕП файл: {kep_path.name}")
-            file_input = await page.query_selector("#PKeyFileInput")
-            if not file_input:
-                raise RuntimeError("Поле для файлу #PKeyFileInput не знайдено")
+            # #PKeyFileInput прихований CSS (за drag-drop зоною) — state="attached"
+            try:
+                file_input = await page.wait_for_selector(
+                    "#PKeyFileInput", state="attached", timeout=8_000
+                )
+            except PWTimeout:
+                raise RuntimeError("Поле для файлу #PKeyFileInput не знайдено в DOM")
             await file_input.set_input_files(str(kep_path))
-            await asyncio.sleep(2)  # час на читання файлу JS-бібліотекою
+            await asyncio.sleep(5)  # JS-бібліотека читає і розбирає JKS
 
             # ── Step 7: Ввести пароль ─────────────────────────────────────
             print("[auth] Вводжу пароль ...")
