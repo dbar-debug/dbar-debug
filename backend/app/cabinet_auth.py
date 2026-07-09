@@ -125,13 +125,16 @@ async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -
             await page.click("#id-app-login-sign-form-file-key-sign-button")
 
             # ── Step 8b: Підтвердити дані (id.gov.ua показує "Перевірте дані") ──
-            # Після підпису виникає сторінка з ПІБ/РНОКПП — треба ще раз натиснути
-            try:
-                await page.wait_for_selector(
-                    "button:has-text('Продовжити'), a:has-text('Продовжити')",
-                    timeout=15_000,
-                )
+            # Після підпису виникає сторінка з ПІБ/РНОКПП — треба ще раз натиснути.
+            # Важливо: чекаємо саме появу тексту "Перевірте дані", а не кнопки
+            # "Продовжити" — вона з тим самим текстом є і на попередній формі,
+            # тож wait_for_selector міг би "знайти" стару кнопку одразу.
+            confirmed = False
+            for _ in range(10):  # до ~20с
+                await asyncio.sleep(2)
                 body = await page.inner_text("body")
+                if "cabinet.court.gov.ua" in page.url and "login" not in page.url:
+                    break  # вже редиректнуло без сторінки підтвердження
                 if "Перевірте дані" in body or "Зверніть увагу" in body:
                     print("[auth] Сторінка підтвердження даних — натискаю Продовжити...")
                     confirm_btn = await page.query_selector("button:has-text('Продовжити')")
@@ -139,8 +142,10 @@ async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -
                         confirm_btn = await page.query_selector("a:has-text('Продовжити')")
                     if confirm_btn:
                         await confirm_btn.click()
-            except PWTimeout:
-                pass  # сторінка підтвердження не з'явилась — це теж нормально
+                        confirmed = True
+                    break
+            if not confirmed:
+                print("[auth] Сторінка підтвердження не з'явилась (або вже редиректнуло)")
 
             # Чекаємо на редирект назад до cabinet.court.gov.ua
             try:
