@@ -48,20 +48,25 @@ async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
 
         try:
             print(f"[scraper] Opening {REGISTRY_URL} ...")
-            await page.goto(REGISTRY_URL, wait_until="networkidle", timeout=30_000)
+            await page.goto(REGISTRY_URL, wait_until="domcontentloaded", timeout=30_000)
 
             # Fill search field and click submit button
-            await page.wait_for_selector(SEARCH_INPUT_SELECTOR, timeout=10_000)
+            await page.wait_for_selector(SEARCH_INPUT_SELECTOR, timeout=15_000)
             await page.fill(SEARCH_INPUT_SELECTOR, full_name)
             await page.click(SUBMIT_BUTTON_SELECTOR)
-            await page.wait_for_load_state("networkidle", timeout=15_000)
+            # Чекаємо АБО рядки результатів, АБО повідомлення "не знайдено" —
+            # не залежимо від конкретного лічильника, який часто зникає.
+            try:
+                await page.wait_for_selector(
+                    f"{RESULT_ITEM_SELECTOR}, .no-results, #no_results",
+                    timeout=20_000,
+                )
+            except PlaywrightTimeout:
+                pass  # можливо, результатів немає взагалі
+            await asyncio.sleep(1)
 
-            # Total count shown near top of results
-            total_text = await page.text_content(".searchResultText, .pagerRecords, #pagerRecords")
-            if total_text:
-                numbers = re.findall(r"\d+", total_text)
-                if numbers:
-                    total_found = int(numbers[0])
+            # Лічильник загальної кількості — НЕобов'язковий, без блокуючого чекання
+            total_found = await _read_total_count(page)
 
             for page_num in range(max_pages):
                 print(f"[scraper] Parsing page {page_num + 1} ...")
@@ -87,6 +92,18 @@ async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
             await browser.close()
 
     return SearchResult(query=full_name, total_found=total_found or len(cases), cases=cases)
+
+
+async def _read_total_count(page) -> int:
+    """Прочитати лічильник результатів, якщо він є. Ніколи не блокує."""
+    for sel in [".searchResultText", ".pagerRecords", "#pagerRecords", ".search-results-count"]:
+        el = await page.query_selector(sel)
+        if el:
+            text = await el.inner_text()
+            numbers = re.findall(r"\d+", text or "")
+            if numbers:
+                return int(numbers[0])
+    return 0
 
 
 async def _parse_results_page(page) -> List[CourtCase]:
