@@ -5,6 +5,7 @@ Debug: авторизація через КЕП + перехід у "Мої сп
 """
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -12,6 +13,39 @@ from app.cabinet_auth import get_session, clear_session, apply_session
 
 OUT = Path("debug_output")
 OUT.mkdir(exist_ok=True)
+
+# Тут накопичуємо всі XHR/fetch-відповіді з JSON, зроблені сторінкою —
+# так можна знайти внутрішній API cabinet.court.gov.ua і працювати з ним
+# напряму (JSON) замість крихкого парсингу HTML-таблиць.
+API_CALLS = []
+
+
+def make_response_logger():
+    async def on_response(response):
+        try:
+            req = response.request
+            if req.resource_type not in ("xhr", "fetch"):
+                return
+            url = response.url
+            status = response.status
+            ctype = response.headers.get("content-type", "")
+            if "json" not in ctype:
+                return
+            try:
+                body = await response.text()
+            except Exception:
+                body = ""
+            entry = {
+                "method": req.method,
+                "url": url,
+                "status": status,
+                "body_preview": body[:2000],
+            }
+            API_CALLS.append(entry)
+            print(f"  [api] {req.method} {status} {url}")
+        except Exception as e:
+            print(f"  [api] помилка логування відповіді: {e}")
+    return on_response
 
 
 async def snap(page, name):
@@ -53,6 +87,7 @@ async def main():
         )
         await apply_session(context, session)
         page = await context.new_page()
+        page.on("response", make_response_logger())
 
         print("[2] Відкриваю cabinet.court.gov.ua/ ...")
         await page.goto("https://cabinet.court.gov.ua/", wait_until="networkidle", timeout=30_000)
@@ -105,7 +140,16 @@ async def main():
 
         await browser.close()
 
-    print("\nГотово! Перевірте debug_output/cases_*.png та cases_*.html")
+    # Зберегти всі перехоплені JSON API-виклики
+    (OUT / "cases_api_calls.json").write_text(
+        json.dumps(API_CALLS, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"\n[6] Перехоплено {len(API_CALLS)} JSON API-викликів (див. debug_output/cases_api_calls.json)")
+    for c in API_CALLS:
+        print(f"  {c['method']} {c['status']} {c['url']}")
+        print(f"    preview: {c['body_preview'][:300]}")
+
+    print("\nГотово! Перевірте debug_output/cases_*.png, cases_*.html та cases_api_calls.json")
 
 
 asyncio.run(main())
