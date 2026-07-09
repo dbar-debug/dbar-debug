@@ -6,6 +6,7 @@ class CourtCase {
   final String url;
   final String excerpt;
   final String status; // тільки для кабінету, порожньо для публічного пошуку
+  final String judge; // тільки для кабінету
 
   CourtCase({
     required this.caseNumber,
@@ -15,6 +16,7 @@ class CourtCase {
     required this.url,
     this.excerpt = '',
     this.status = '',
+    this.judge = '',
   });
 
   factory CourtCase.fromSearchJson(Map<String, dynamic> json) {
@@ -36,6 +38,7 @@ class CourtCase {
       subtitle: json['my_role'] as String? ?? '—',
       url: json['url'] as String? ?? '',
       status: json['status'] as String? ?? '',
+      judge: json['judge'] as String? ?? '',
     );
   }
 }

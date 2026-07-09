@@ -11,6 +11,7 @@ class CourtCase:
     url: str
     excerpt: str = ""
     status: str = ""
+    judge: str = ""
 
 
 @dataclass

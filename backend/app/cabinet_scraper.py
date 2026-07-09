@@ -95,4 +95,17 @@ def _to_court_case(raw: dict, my_user_id: str, courts: dict, roles: dict, status
         document_type=my_role,
         url=f"{CABINET_URL}/cases/{raw.get('id', '')}",
         status=statuses.get(raw.get("status"), "—"),
+        judge=_extract_presiding_judge(raw),
     )
+
+
+def _extract_presiding_judge(raw: dict) -> str:
+    """roleId=1 ("presidentJudge"/Головуючий) — головний суддя по справі."""
+    judges = raw.get("caseJudges") or []
+    presiding = [j.get("name", "") for j in judges if j.get("roleId") == 1 and j.get("name")]
+    if presiding:
+        # унікальні імена (буває кілька проваджень з тим самим головуючим)
+        return ", ".join(dict.fromkeys(presiding))
+    # запасний варіант — будь-який суддя, якщо головуючого не позначено
+    any_judge = [j.get("name", "") for j in judges if j.get("name")]
+    return ", ".join(dict.fromkeys(any_judge)) if any_judge else "—"

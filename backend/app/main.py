@@ -69,6 +69,7 @@ async def cabinet_cases():
                     "date":        c.date,
                     "my_role":     c.document_type,
                     "status":      c.status,
+                    "judge":       c.judge,
                     "url":         c.url,
                 }
                 for c in result.cases
