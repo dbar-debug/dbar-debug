@@ -186,6 +186,66 @@ async def get_case_documents(session: dict, case_id: str) -> List[CaseDocument]:
     return documents
 
 
+async def get_calendar_events(session: dict) -> List[dict]:
+    """
+    Збирає всі документи всіх справ як події для календаря (за один сеанс).
+    Кожна подія: {date, case_number, court_name, description, doc_id, case_id}.
+    Документи типу 'Внесення дат слухання' позначають призначені засідання.
+    """
+    cookies = session.get("cookies") or []
+    token = (session.get("local_storage") or {}).get("token", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    events: List[dict] = []
+    async with async_playwright() as pw:
+        api = await pw.request.new_context(
+            storage_state={"cookies": cookies, "origins": []},
+            extra_http_headers=headers,
+        )
+        try:
+            courts = await _get_dictionary(api, "/api/dictionaries/courts", key="name")
+            raw_cases = await _get_my_cases_raw(api)
+            for case in raw_cases:
+                case_id = case.get("id", "")
+                case_number = case.get("number", "—")
+                court_name = courts.get(case.get("courtId"), "—")
+
+                start = 0
+                page_size = 100
+                while True:
+                    resp = await api.get(
+                        f"{CABINET_URL}/api/documents/case",
+                        params={
+                            "case_id": case_id,
+                            "start": start,
+                            "count": page_size,
+                            "sort[docDate]": "desc",
+                            "is_not_deleted": 1,
+                        },
+                    )
+                    page = (await resp.json()).get("data") or []
+                    for d in page:
+                        date = (d.get("docDate") or "")[:10]
+                        if not date:
+                            continue
+                        events.append({
+                            "date": date,
+                            "case_number": case_number,
+                            "court_name": court_name,
+                            "description": d.get("description", "—"),
+                            "doc_id": d.get("id", ""),
+                            "case_id": case_id,
+                        })
+                    if len(page) < page_size:
+                        break
+                    start += page_size
+        finally:
+            await api.dispose()
+
+    print(f"[cabinet] Календар: {len(events)} подій з {len(raw_cases)} справ")
+    return events
+
+
 async def get_document_file(session: dict, doc_id: str) -> tuple[bytes, str]:
     """
     Повертає (вміст_файлу, content_type) документа через

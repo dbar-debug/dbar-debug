@@ -35,6 +35,43 @@ class CaseDocument {
   }
 }
 
+class CalendarEvent {
+  final DateTime date;
+  final String caseNumber;
+  final String courtName;
+  final String description;
+  final String docId;
+  final String caseId;
+
+  CalendarEvent({
+    required this.date,
+    required this.caseNumber,
+    required this.courtName,
+    required this.description,
+    required this.docId,
+    required this.caseId,
+  });
+
+  /// Ознака, що подія — про призначене засідання/слухання.
+  bool get isHearing {
+    final d = description.toLowerCase();
+    return d.contains('слухан') || d.contains('засідан') || d.contains('розгляд');
+  }
+
+  factory CalendarEvent.fromJson(Map<String, dynamic> json) {
+    final raw = json['date'] as String? ?? '';
+    final parsed = DateTime.tryParse(raw) ?? DateTime(1970);
+    return CalendarEvent(
+      date: DateTime(parsed.year, parsed.month, parsed.day),
+      caseNumber: json['case_number'] as String? ?? '—',
+      courtName: json['court_name'] as String? ?? '—',
+      description: json['description'] as String? ?? '—',
+      docId: json['doc_id'] as String? ?? '',
+      caseId: json['case_id'] as String? ?? '',
+    );
+  }
+}
+
 class CourtCase {
   final String caseNumber;
   final String courtName;

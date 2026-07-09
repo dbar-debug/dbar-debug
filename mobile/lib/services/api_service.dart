@@ -81,6 +81,20 @@ class ApiService {
     return Uri.parse('$base/cabinet/documents/$docId/file');
   }
 
+  Future<List<CalendarEvent>> getCalendarEvents() async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/cabinet/calendar');
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 120));
+    final body = _decodeOrThrow(response);
+
+    final events = (body['events'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(CalendarEvent.fromJson)
+        .toList();
+    return events;
+  }
+
   Map<String, dynamic> _decodeOrThrow(http.Response response) {
     Map<String, dynamic> body;
     try {
