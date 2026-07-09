@@ -4,6 +4,7 @@ import '../models/court_case.dart';
 import '../services/api_service.dart';
 import '../widgets/case_detail_sheet.dart';
 import '../widgets/case_list_tile.dart';
+import '../widgets/state_views.dart';
 
 class CabinetScreen extends StatefulWidget {
   const CabinetScreen({super.key});
@@ -18,6 +19,7 @@ class _CabinetScreenState extends State<CabinetScreen> {
   List<CourtCase> _cases = [];
   bool _loading = true;
   String? _error;
+  String? _statusFilter; // null = усі
 
   @override
   void initState() {
@@ -40,13 +42,56 @@ class _CabinetScreenState extends State<CabinetScreen> {
     }
   }
 
+  List<String> get _availableStatuses {
+    final statuses = _cases.map((c) => c.status).where((s) => s.isNotEmpty).toSet().toList();
+    statuses.sort();
+    return statuses;
+  }
+
+  List<CourtCase> get _filteredCases {
+    if (_statusFilter == null) return _cases;
+    return _cases.where((c) => c.status == _statusFilter).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final title = _cases.isEmpty ? 'Мої справи' : 'Мої справи · ${_filteredCases.length}';
     return Scaffold(
-      appBar: AppBar(title: const Text('Мої справи')),
+      appBar: AppBar(title: Text(title)),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: _buildBody(),
+        child: Column(
+          children: [
+            if (!_loading && _error == null && _availableStatuses.length > 1) _buildFilterChips(),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            ChoiceChip(
+              label: const Text('Усі'),
+              selected: _statusFilter == null,
+              onSelected: (_) => setState(() => _statusFilter = null),
+            ),
+            for (final status in _availableStatuses) ...[
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(status),
+                selected: _statusFilter == status,
+                onSelected: (_) => setState(() => _statusFilter = status),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -56,37 +101,22 @@ class _CabinetScreenState extends State<CabinetScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
-      return ListView(
-        children: [
-          const SizedBox(height: 80),
-          Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: OutlinedButton(onPressed: _load, child: const Text('Спробувати ще раз')),
-          ),
-        ],
-      );
+      return ErrorStateView(message: _error!, onRetry: _load);
     }
     if (_cases.isEmpty) {
-      return ListView(
-        children: const [
-          SizedBox(height: 120),
-          Center(child: Text('Справ не знайдено')),
-        ],
+      return const EmptyStateView(icon: Icons.folder_off_outlined, message: 'Справ не знайдено');
+    }
+    final cases = _filteredCases;
+    if (cases.isEmpty) {
+      return const EmptyStateView(
+        icon: Icons.filter_alt_off_outlined,
+        message: 'Немає справ з обраним статусом',
       );
     }
     return ListView.builder(
-      itemCount: _cases.length,
+      itemCount: cases.length,
       itemBuilder: (context, index) {
-        final c = _cases[index];
+        final c = cases[index];
         return CaseListTile(
           courtCase: c,
           onTap: () => showCaseDetailSheet(context, c),

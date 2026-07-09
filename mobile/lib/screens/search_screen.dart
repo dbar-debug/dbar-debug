@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/court_case.dart';
 import '../services/api_service.dart';
 import '../widgets/case_list_tile.dart';
+import '../widgets/state_views.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -57,31 +58,45 @@ class _SearchScreenState extends State<SearchScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'ПІБ особи',
                       hintText: 'Іваненко Іван Іванович',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _controller,
+                        builder: (context, value, _) {
+                          if (value.text.isEmpty) return const SizedBox.shrink();
+                          return IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setState(() => _controller.clear()),
+                          );
+                        },
+                      ),
                     ),
+                    textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _search(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
                   onPressed: _loading ? null : _search,
-                  icon: const Icon(Icons.search),
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.search),
                 ),
               ],
             ),
           ),
-          if (_loading) const LinearProgressIndicator(),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(_error!, style: const TextStyle(color: Colors.red)),
             ),
-          Expanded(
-            child: _buildResults(),
-          ),
+          Expanded(child: _buildResults()),
         ],
       ),
     );
@@ -89,12 +104,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResults() {
     if (!_searched) {
-      return const Center(
-        child: Text('Введіть ПІБ для пошуку в Єдиному реєстрі судових рішень'),
+      return const EmptyStateView(
+        icon: Icons.search,
+        message: 'Введіть ПІБ для пошуку в Єдиному реєстрі судових рішень',
       );
     }
     if (!_loading && _results.isEmpty && _error == null) {
-      return const Center(child: Text('Нічого не знайдено'));
+      return const EmptyStateView(icon: Icons.search_off, message: 'Нічого не знайдено');
     }
     return ListView.builder(
       itemCount: _results.length,
