@@ -135,17 +135,55 @@ async def cabinet_document_file(doc_id: str):
         session = await get_session(kep_file, password)
         body, content_type = await get_document_file(session, doc_id)
 
-        # Для HTML-рішень переписуємо відносні посилання (герб, стилі),
-        # щоб вони вантажились із cabinet.court.gov.ua, а не з нашого хоста.
         if "html" in content_type.lower():
-            html = body.decode("utf-8", errors="replace")
-            if "<base" not in html.lower():
-                html = html.replace("<head>", f'<head><base href="{CABINET_URL}/">', 1)
-            body = html.encode("utf-8")
+            body, content_type = _prepare_html_document(body)
 
         return Response(content=body, media_type=content_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _prepare_html_document(body: bytes) -> tuple[bytes, str]:
+    """
+    Судові HTML-рішення зазвичай у windows-1251. Визначаємо кодування,
+    перекодовуємо у UTF-8, чистимо старий charset у <meta> і додаємо
+    <base href> — щоб герб/стилі суду вантажились, а кирилиця не була
+    ромбиками.
+    """
+    import re
+
+    # 1. Визначаємо кодування
+    head = body[:2048].decode("ascii", errors="ignore").lower()
+    if "charset=windows-1251" in head or "charset=cp1251" in head:
+        enc = "cp1251"
+    elif "charset=utf-8" in head:
+        enc = "utf-8"
+    else:
+        # мета-тегу немає — пробуємо utf-8, інакше cp1251 (типове для судів)
+        try:
+            body.decode("utf-8")
+            enc = "utf-8"
+        except UnicodeDecodeError:
+            enc = "cp1251"
+
+    html = body.decode(enc, errors="replace")
+
+    # 2. Прибираємо старий charset, щоб браузер не перекодовував UTF-8 як cp1251
+    html = re.sub(
+        r'<meta[^>]*charset[^>]*>',
+        '<meta charset="utf-8">',
+        html,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    if "charset" not in html[:2048].lower():
+        html = html.replace("<head>", '<head><meta charset="utf-8">', 1)
+
+    # 3. <base href> для відносних ресурсів (герб, CSS)
+    if "<base" not in html.lower():
+        html = html.replace("<head>", f'<head><base href="{CABINET_URL}/">', 1)
+
+    return html.encode("utf-8"), "text/html; charset=utf-8"
 
 
 @app.get("/search", response_model=dict)
