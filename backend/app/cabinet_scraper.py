@@ -38,11 +38,12 @@ async def get_my_cases(session: dict) -> SearchResult:
             my_user_id = await _get_my_user_id(api)
             courts = await _get_dictionary(api, "/api/dictionaries/courts", key="name")
             roles = await _get_dictionary(api, "/api/dictionaries/cases/member_roles", key="description")
+            statuses = await _get_dictionary(api, "/api/dictionaries/case_statuses", key="name")
             raw_cases = await _get_my_cases_raw(api)
         finally:
             await api.dispose()
 
-    cases = [_to_court_case(rc, my_user_id, courts, roles) for rc in raw_cases]
+    cases = [_to_court_case(rc, my_user_id, courts, roles, statuses) for rc in raw_cases]
     print(f"[cabinet] Знайдено {len(cases)} справ")
 
     return SearchResult(query="cabinet", total_found=len(cases), cases=cases)
@@ -77,7 +78,7 @@ async def _get_my_cases_raw(api) -> List[dict]:
     return all_cases
 
 
-def _to_court_case(raw: dict, my_user_id: str, courts: dict, roles: dict) -> CourtCase:
+def _to_court_case(raw: dict, my_user_id: str, courts: dict, roles: dict, statuses: dict) -> CourtCase:
     my_member = next(
         (m for m in raw.get("caseMembers", []) if m.get("userId") == my_user_id),
         None,
@@ -93,4 +94,5 @@ def _to_court_case(raw: dict, my_user_id: str, courts: dict, roles: dict) -> Cou
         date=date,
         document_type=my_role,
         url=f"{CABINET_URL}/cases/{raw.get('id', '')}",
+        status=statuses.get(raw.get("status"), "—"),
     )

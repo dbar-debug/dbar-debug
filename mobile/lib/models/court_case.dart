@@ -5,6 +5,7 @@ class CourtCase {
   final String subtitle; // "my_role" для кабінету, "document_type" для пошуку
   final String url;
   final String excerpt;
+  final String status; // тільки для кабінету, порожньо для публічного пошуку
 
   CourtCase({
     required this.caseNumber,
@@ -13,6 +14,7 @@ class CourtCase {
     required this.subtitle,
     required this.url,
     this.excerpt = '',
+    this.status = '',
   });
 
   factory CourtCase.fromSearchJson(Map<String, dynamic> json) {
@@ -33,6 +35,7 @@ class CourtCase {
       date: json['date'] as String? ?? '—',
       subtitle: json['my_role'] as String? ?? '—',
       url: json['url'] as String? ?? '',
+      status: json['status'] as String? ?? '',
     );
   }
 }

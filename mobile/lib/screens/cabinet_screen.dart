@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/court_case.dart';
 import '../services/api_service.dart';
+import '../widgets/case_detail_sheet.dart';
 import '../widgets/case_list_tile.dart';
 
 class CabinetScreen extends StatefulWidget {
@@ -89,9 +89,7 @@ class _CabinetScreenState extends State<CabinetScreen> {
         final c = _cases[index];
         return CaseListTile(
           courtCase: c,
-          onTap: c.url.isEmpty
-              ? null
-              : () => launchUrl(Uri.parse(c.url), mode: LaunchMode.externalApplication),
+          onTap: () => showCaseDetailSheet(context, c),
         );
       },
     );

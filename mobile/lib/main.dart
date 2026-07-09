@@ -15,7 +15,17 @@ class CourtApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Судові справи',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.light,
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.dark,
+        useMaterial3: true,
+      ),
       home: const HomeTabs(),
     );
   }

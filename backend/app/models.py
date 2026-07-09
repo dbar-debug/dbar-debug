@@ -10,6 +10,7 @@ class CourtCase:
     document_type: str
     url: str
     excerpt: str = ""
+    status: str = ""
 
 
 @dataclass
