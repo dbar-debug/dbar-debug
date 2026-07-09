@@ -124,11 +124,28 @@ async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -
             print("[auth] Натискаю 'Продовжити' ...")
             await page.click("#id-app-login-sign-form-file-key-sign-button")
 
+            # ── Step 8b: Підтвердити дані (id.gov.ua показує "Перевірте дані") ──
+            # Після підпису виникає сторінка з ПІБ/РНОКПП — треба ще раз натиснути
+            try:
+                await page.wait_for_selector(
+                    "button:has-text('Продовжити'), a:has-text('Продовжити')",
+                    timeout=15_000,
+                )
+                body = await page.inner_text("body")
+                if "Перевірте дані" in body or "Зверніть увагу" in body:
+                    print("[auth] Сторінка підтвердження даних — натискаю Продовжити...")
+                    confirm_btn = await page.query_selector("button:has-text('Продовжити')")
+                    if not confirm_btn:
+                        confirm_btn = await page.query_selector("a:has-text('Продовжити')")
+                    if confirm_btn:
+                        await confirm_btn.click()
+            except PWTimeout:
+                pass  # сторінка підтвердження не з'явилась — це теж нормально
+
             # Чекаємо на редирект назад до cabinet.court.gov.ua
             try:
                 await page.wait_for_url(f"{CABINET_URL}/**", timeout=30_000)
             except PWTimeout:
-                # Перевірити чи є повідомлення про помилку
                 err = await _get_error_text(page)
                 raise RuntimeError(f"Авторизація не завершилась. {err}")
 

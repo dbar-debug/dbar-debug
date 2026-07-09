@@ -234,7 +234,8 @@ async def main():
             else:
                 print("  ПОМИЛКА: кнопка Продовжити не знайдена!")
 
-        # Чекати редирект до cabinet
+        # Чекати редирект до cabinet або сторінку підтвердження даних
+        clicked_confirm = False
         for i in range(10):
             await asyncio.sleep(3)
             url = page.url
@@ -242,13 +243,30 @@ async def main():
                 body_text = await page.inner_text("body")
                 short = " | ".join(l.strip() for l in body_text.splitlines() if l.strip())[:200]
             except Exception:
+                body_text = ""
                 short = ""
             print(f"  [{(i+1)*3}с] URL: {url}")
             if short:
                 print(f"        Текст: {short}")
+
             if "cabinet.court.gov.ua" in url and "login" not in url:
                 print("  *** АВТОРИЗАЦІЯ УСПІШНА! ***")
                 break
+
+            # Сторінка "Перевірте дані" — потрібен ще один клік Продовжити
+            if not clicked_confirm and (
+                "Перевірте дані" in body_text or "Зверніть увагу" in body_text
+            ):
+                print("  [!] Сторінка підтвердження даних — клікаю Продовжити...")
+                confirm_btn = await page.query_selector("button:has-text('Продовжити')")
+                if not confirm_btn:
+                    confirm_btn = await page.query_selector("a:has-text('Продовжити')")
+                if confirm_btn:
+                    await confirm_btn.click()
+                    print("  [OK] Продовжити натиснуто, чекаю редирект...")
+                    clicked_confirm = True
+                else:
+                    print("  [!] Кнопку Продовжити на сторінці підтвердження не знайдено!")
 
         await snap(page, "7_after_continue")
         await browser.close()
