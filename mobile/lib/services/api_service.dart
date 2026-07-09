@@ -60,6 +60,20 @@ class ApiService {
     return cases;
   }
 
+  Future<List<CaseDocument>> getCaseDocuments(String caseId) async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/cabinet/cases/$caseId/documents');
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final body = _decodeOrThrow(response);
+
+    final docs = (body['documents'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(CaseDocument.fromJson)
+        .toList();
+    return docs;
+  }
+
   Map<String, dynamic> _decodeOrThrow(http.Response response) {
     Map<String, dynamic> body;
     try {

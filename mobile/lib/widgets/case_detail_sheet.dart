@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/court_case.dart';
+import '../screens/case_documents_screen.dart';
 
 /// Показує деталі справи прямо в додатку. Ми НЕ переходимо одразу на
 /// cabinet.court.gov.ua, бо там окрема авторизація в браузері — сесія
@@ -74,19 +75,23 @@ class _CaseDetailSheet extends StatelessWidget {
                   for (final m in courtCase.members) _ParticipantRow(name: m.name, role: m.role),
                 ],
                 const SizedBox(height: 20),
-                if (courtCase.url.isNotEmpty) ...[
-                  Text(
-                    'Повні документи та деталі справи доступні лише на сайті суду '
-                    'після входу власним КЕП/Дія.Підпис у браузері.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                if (courtCase.caseId.isNotEmpty)
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => CaseDocumentsScreen(courtCase: courtCase),
+                      ));
+                    },
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('Документи по справі'),
                   ),
-                  const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
+                if (courtCase.url.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
                     onPressed: () =>
                         launchUrl(Uri.parse(courtCase.url), mode: LaunchMode.externalApplication),
-                    icon: const Icon(Icons.open_in_new),
+                    icon: const Icon(Icons.open_in_new, size: 18),
                     label: const Text('Відкрити на сайті суду'),
                   ),
                 ],

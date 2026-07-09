@@ -15,7 +15,7 @@ from typing import List
 
 from playwright.async_api import async_playwright
 
-from app.models import CaseJudge, CaseMember, CourtCase, SearchResult
+from app.models import CaseDocument, CaseJudge, CaseMember, CourtCase, SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
 
@@ -130,9 +130,60 @@ def _to_court_case(
         created_at=(raw.get("createdAt") or "")[:10],
         updated_at=(raw.get("updatedAt") or "")[:10],
         proceeding_number=proceeding_number,
+        case_id=raw.get("id", ""),
         members=members,
         judges=judges,
     )
+
+
+async def get_case_documents(session: dict, case_id: str) -> List[CaseDocument]:
+    """
+    Повертає документи по справі через /api/documents/case.
+    Показує рух справи: рішення, ухвали, реєстраційні картки,
+    'Внесення дат слухання' тощо — відсортовані від новіших до старіших.
+    """
+    cookies = session.get("cookies") or []
+    token = (session.get("local_storage") or {}).get("token", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    documents: List[CaseDocument] = []
+    async with async_playwright() as pw:
+        api = await pw.request.new_context(
+            storage_state={"cookies": cookies, "origins": []},
+            extra_http_headers=headers,
+        )
+        try:
+            start = 0
+            page_size = 100
+            while True:
+                resp = await api.get(
+                    f"{CABINET_URL}/api/documents/case",
+                    params={
+                        "case_id": case_id,
+                        "start": start,
+                        "count": page_size,
+                        "sort[docDate]": "desc",
+                        "is_not_deleted": 1,
+                    },
+                )
+                page = (await resp.json()).get("data") or []
+                for d in page:
+                    documents.append(
+                        CaseDocument(
+                            number=d.get("number", "—"),
+                            date=(d.get("docDate") or "")[:10],
+                            description=d.get("description", "—"),
+                            doc_id=d.get("id", ""),
+                        )
+                    )
+                if len(page) < page_size:
+                    break
+                start += page_size
+        finally:
+            await api.dispose()
+
+    print(f"[cabinet] Справа {case_id}: знайдено {len(documents)} документів")
+    return documents
 
 
 def _extract_members(raw: dict, member_roles: dict) -> List[CaseMember]:

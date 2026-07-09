@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.scraper import search_by_name
 from app.cabinet_auth import get_session, clear_session
-from app.cabinet_scraper import get_my_cases
+from app.cabinet_scraper import get_my_cases, get_case_documents
 from app.models import SearchResult
 
 app = FastAPI(
@@ -74,6 +74,7 @@ async def cabinet_cases():
                     "created_at":  c.created_at,
                     "updated_at":  c.updated_at,
                     "proceeding_number": c.proceeding_number,
+                    "case_id":     c.case_id,
                     "members": [
                         {"name": m.name, "role": m.role} for m in c.members
                     ],
@@ -82,6 +83,35 @@ async def cabinet_cases():
                     ],
                 }
                 for c in result.cases
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/cabinet/cases/{case_id}/documents")
+async def cabinet_case_documents(case_id: str):
+    """Повертає документи по конкретній справі (рух справи, ухвали, рішення)."""
+    kep_file = os.getenv("KEP_FILE_PATH", "")
+    password = os.getenv("KEP_PASSWORD", "")
+    if not kep_file or not password:
+        raise HTTPException(
+            status_code=400,
+            detail="Встановіть KEP_FILE_PATH та KEP_PASSWORD у .env файлі або викличте /cabinet/login"
+        )
+    try:
+        session = await get_session(kep_file, password)
+        docs = await get_case_documents(session, case_id)
+        return {
+            "total_found": len(docs),
+            "documents": [
+                {
+                    "number":      d.number,
+                    "date":        d.date,
+                    "description": d.description,
+                    "doc_id":      d.doc_id,
+                }
+                for d in docs
             ],
         }
     except Exception as e:

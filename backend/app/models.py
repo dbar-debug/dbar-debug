@@ -15,6 +15,14 @@ class CaseJudge:
 
 
 @dataclass
+class CaseDocument:
+    number: str
+    date: str
+    description: str  # тип документа: Рішення, Ухвала, Реєстраційна картка, Внесення дат слухання...
+    doc_id: str
+
+
+@dataclass
 class CourtCase:
     case_number: str
     court_name: str
@@ -27,6 +35,7 @@ class CourtCase:
     created_at: str = ""
     updated_at: str = ""
     proceeding_number: str = ""
+    case_id: str = ""
     members: List[CaseMember] = field(default_factory=list)
     judges: List[CaseJudge] = field(default_factory=list)
 

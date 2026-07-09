@@ -12,6 +12,29 @@ class CaseParticipant {
   }
 }
 
+class CaseDocument {
+  final String number;
+  final String date;
+  final String description;
+  final String docId;
+
+  CaseDocument({
+    required this.number,
+    required this.date,
+    required this.description,
+    required this.docId,
+  });
+
+  factory CaseDocument.fromJson(Map<String, dynamic> json) {
+    return CaseDocument(
+      number: json['number'] as String? ?? '—',
+      date: json['date'] as String? ?? '—',
+      description: json['description'] as String? ?? '—',
+      docId: json['doc_id'] as String? ?? '',
+    );
+  }
+}
+
 class CourtCase {
   final String caseNumber;
   final String courtName;
@@ -24,6 +47,7 @@ class CourtCase {
   final String createdAt;
   final String updatedAt;
   final String proceedingNumber;
+  final String caseId;
   final List<CaseParticipant> members;
   final List<CaseParticipant> judges;
 
@@ -39,6 +63,7 @@ class CourtCase {
     this.createdAt = '',
     this.updatedAt = '',
     this.proceedingNumber = '',
+    this.caseId = '',
     this.members = const [],
     this.judges = const [],
   });
@@ -66,6 +91,7 @@ class CourtCase {
       createdAt: json['created_at'] as String? ?? '',
       updatedAt: json['updated_at'] as String? ?? '',
       proceedingNumber: json['proceeding_number'] as String? ?? '',
+      caseId: json['case_id'] as String? ?? '',
       members: (json['members'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>()
           .map(CaseParticipant.fromJson)
