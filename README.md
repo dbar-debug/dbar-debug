@@ -63,6 +63,37 @@ curl -s http://localhost:8000/cabinet/cases | python3 -m json.tool
 4 години. Дані справ отримуються напряму з внутрішнього JSON API
 `cabinet.court.gov.ua/api/cases/my` — без HTML-скрапінгу.
 
+## Telegram-бот сповіщень
+
+Раз на `NOTIFIER_POLL_MINUTES` (за замовчуванням 30) бот опитує
+`cabinet.court.gov.ua`, порівнює статус/суддю/дату оновлення кожної справи
+зі збереженим знімком (`backend/data/cases_snapshot.json`) і надсилає
+повідомлення про зміни всім підписаним чатам.
+
+1. Створіть бота через [@BotFather](https://t.me/BotFather), отримайте токен.
+2. Додайте `TELEGRAM_BOT_TOKEN` у `backend/.env` (див. `.env.example`).
+3. Запустіть бота:
+
+   ```bash
+   cd backend
+   python -m app.telegram_bot
+   ```
+
+   Або через Docker (сервіс `bot` вже є в `docker-compose.yml`):
+
+   ```bash
+   docker-compose up -d
+   ```
+
+4. У Telegram напишіть боту `/start` — підписка на сповіщення.
+
+Команди бота:
+
+- `/start` — підписатися на сповіщення
+- `/stop` — відписатися
+- `/cases` — поточний список справ і статуси
+- `/check` — перевірити зміни негайно, не чекаючи розкладу
+
 ## Мобільний додаток
 
 Flutter-клієнт для iPhone/Android/Web — див. `mobile/README.md`.

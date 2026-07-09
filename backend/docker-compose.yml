@@ -4,5 +4,22 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./sessions:/app/sessions
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./sessions:/app/sessions
+    command: ["python", "-m", "app.telegram_bot"]
