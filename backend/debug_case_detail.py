@@ -79,39 +79,59 @@ async def main():
         page = await context.new_page()
         page.on("response", make_response_logger())
 
-        if not case_id:
-            print("[2] case_id не вказано — відкриваю список справ, щоб взяти перший...")
-            await page.goto("https://cabinet.court.gov.ua/cases", wait_until="networkidle", timeout=30_000)
-            try:
-                row = await page.wait_for_selector("tr[id^='cases-row-0']", timeout=15_000)
-            except PWTimeout:
-                row = None
-            if row:
-                print("  Клікаю на перший рядок таблиці...")
-                await row.click()
-            else:
-                print("  ПОМИЛКА: не знайшов рядків у таблиці справ за 15с")
-                await browser.close()
-                return
-        else:
-            print(f"[2] Відкриваю справу {case_id} напряму...")
-            await page.goto(f"https://cabinet.court.gov.ua/cases/{case_id}", wait_until="domcontentloaded", timeout=30_000)
+        # Пряма навігація на /cases/<id> редиректить назад на список (перевірено),
+        # тому деталі відкриваємо як користувач: виділяємо рядок у таблиці і
+        # натискаємо кнопку "ІНФОРМАЦІЯ ПРО СПРАВУ" над нею.
+        print("[2] Відкриваю список справ...")
+        await page.goto("https://cabinet.court.gov.ua/cases", wait_until="networkidle", timeout=30_000)
+        try:
+            row = await page.wait_for_selector("tr[id='cases-row-0']", timeout=20_000)
+        except PWTimeout:
+            row = None
+        if not row:
+            print("  ПОМИЛКА: не знайшов рядків у таблиці справ за 20с")
+            await page.screenshot(path=str(OUT / "case_detail_fail.png"), full_page=True)
+            await browser.close()
+            return
 
-        await page.wait_for_load_state("networkidle", timeout=20_000)
-        await asyncio.sleep(3)
+        print("  Виділяю перший рядок (чекбокс/клік по рядку)...")
+        checkbox = await row.query_selector("input[type='checkbox']")
+        if checkbox:
+            await checkbox.click()
+        else:
+            await row.click()
+        await asyncio.sleep(1)
+
+        print("  Шукаю кнопку 'ІНФОРМАЦІЯ ПРО СПРАВУ'...")
+        info_btn = await page.query_selector("text=ІНФОРМАЦІЯ ПРО СПРАВУ")
+        if not info_btn:
+            info_btn = await page.query_selector("text=Інформація про справу")
+        if info_btn:
+            print("  Клікаю 'ІНФОРМАЦІЯ ПРО СПРАВУ'...")
+            await info_btn.click()
+            await asyncio.sleep(5)  # даємо час на завантаження деталей
+        else:
+            # Може, деталі відкриваються подвійним кліком по рядку
+            print("  Кнопку не знайдено, пробую подвійний клік по рядку...")
+            await row.dblclick()
+            await asyncio.sleep(5)
 
         await page.screenshot(path=str(OUT / "case_detail.png"), full_page=True)
         (OUT / "case_detail.html").write_text(await page.content(), encoding="utf-8")
-        print(f"\n[3] URL деталей справи: {page.url}")
+        print(f"\n[3] Поточний URL: {page.url}")
 
-        # Спробувати проскролити/відкрити вкладку "Засідання", якщо вона є окремим таб
-        for text in ["Засідання", "Судові засідання", "Провадження"]:
+        # Спробувати відкрити вкладки всередині деталей (Засідання/Документи/Провадження)
+        for text in ["Засідання", "Судові засідання", "Документи", "Провадження", "Історія"]:
             tab = await page.query_selector(f"text={text}")
             if tab:
-                print(f"  Знайдено вкладку '{text}' — клікаю...")
-                await tab.click()
-                await asyncio.sleep(2)
+                print(f"  Знайдено вкладку/елемент '{text}' — клікаю...")
+                try:
+                    await tab.click()
+                    await asyncio.sleep(3)
+                except Exception as e:
+                    print(f"    (не вдалося клікнути: {e})")
 
+        await page.screenshot(path=str(OUT / "case_detail_tabs.png"), full_page=True)
         await browser.close()
 
     (OUT / "case_detail_api_calls.json").write_text(
