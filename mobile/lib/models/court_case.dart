@@ -1,3 +1,17 @@
+class CaseParticipant {
+  final String name;
+  final String role;
+
+  CaseParticipant({required this.name, required this.role});
+
+  factory CaseParticipant.fromJson(Map<String, dynamic> json) {
+    return CaseParticipant(
+      name: json['name'] as String? ?? '—',
+      role: json['role'] as String? ?? '—',
+    );
+  }
+}
+
 class CourtCase {
   final String caseNumber;
   final String courtName;
@@ -7,6 +21,10 @@ class CourtCase {
   final String excerpt;
   final String status; // тільки для кабінету, порожньо для публічного пошуку
   final String judge; // тільки для кабінету
+  final String createdAt;
+  final String updatedAt;
+  final List<CaseParticipant> members;
+  final List<CaseParticipant> judges;
 
   CourtCase({
     required this.caseNumber,
@@ -17,6 +35,10 @@ class CourtCase {
     this.excerpt = '',
     this.status = '',
     this.judge = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+    this.members = const [],
+    this.judges = const [],
   });
 
   factory CourtCase.fromSearchJson(Map<String, dynamic> json) {
@@ -39,6 +61,16 @@ class CourtCase {
       url: json['url'] as String? ?? '',
       status: json['status'] as String? ?? '',
       judge: json['judge'] as String? ?? '',
+      createdAt: json['created_at'] as String? ?? '',
+      updatedAt: json['updated_at'] as String? ?? '',
+      members: (json['members'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(CaseParticipant.fromJson)
+          .toList(),
+      judges: (json['judges'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(CaseParticipant.fromJson)
+          .toList(),
     );
   }
 }

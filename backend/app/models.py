@@ -3,6 +3,18 @@ from typing import List
 
 
 @dataclass
+class CaseMember:
+    name: str
+    role: str
+
+
+@dataclass
+class CaseJudge:
+    name: str
+    role: str
+
+
+@dataclass
 class CourtCase:
     case_number: str
     court_name: str
@@ -12,6 +24,10 @@ class CourtCase:
     excerpt: str = ""
     status: str = ""
     judge: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    members: List[CaseMember] = field(default_factory=list)
+    judges: List[CaseJudge] = field(default_factory=list)
 
 
 @dataclass
