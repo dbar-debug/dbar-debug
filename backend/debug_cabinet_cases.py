@@ -8,7 +8,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from app.cabinet_auth import get_session
+from app.cabinet_auth import get_session, clear_session
 
 OUT = Path("debug_output")
 OUT.mkdir(exist_ok=True)
@@ -32,7 +32,8 @@ async def main():
 
     from playwright.async_api import async_playwright
 
-    print("[1] Авторизуюсь через КЕП (кешована сесія, якщо свіжа)...")
+    print("[1] Авторизуюсь через КЕП (примусово свіжа сесія)...")
+    clear_session()  # під час дебагу завжди логінимось заново, кеш може бути невалідний
     cookies = await get_session(kep_file, password)
     print(f"[OK] Отримано {len(cookies)} cookies\n")
 

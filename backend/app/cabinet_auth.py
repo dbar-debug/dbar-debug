@@ -147,12 +147,23 @@ async def authenticate(kep_file: str, password: str, ca_name: str = PRIVAT_CA) -
             if not confirmed:
                 print("[auth] Сторінка підтвердження не з'явилась (або вже редиректнуло)")
 
-            # Чекаємо на редирект назад до cabinet.court.gov.ua
+            # Чекаємо на редирект назад до cabinet.court.gov.ua.
+            # Важливо: спочатку прилітає проміжний /login?code=... (обмін
+            # OAuth-коду), і лише через кілька секунд SPA сама редиректить
+            # на "/" зі справжньою сесією. Якщо зняти cookies на /login?code=
+            # сесія буде недійсна — тож чекаємо саме зникнення /login.
             try:
-                await page.wait_for_url(f"{CABINET_URL}/**", timeout=30_000)
+                await page.wait_for_url(
+                    lambda url: "cabinet.court.gov.ua" in url and "/login" not in url,
+                    timeout=30_000,
+                )
             except PWTimeout:
                 err = await _get_error_text(page)
                 raise RuntimeError(f"Авторизація не завершилась. {err}")
+
+            # Дочекатись поки SPA довантажить дані і остаточно виставить сесійні cookies
+            await page.wait_for_load_state("networkidle", timeout=15_000)
+            await asyncio.sleep(2)
 
             print(f"[auth] Авторизовано! URL: {page.url}")
 
