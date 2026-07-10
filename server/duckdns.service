@@ -1,0 +1,16 @@
+# systemd-сервіс, що оновлює DuckDNS IP (запускається таймером duckdns.timer).
+#
+# Встановлення:
+#   sudo cp duckdns.service duckdns.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now duckdns.timer
+
+[Unit]
+Description=Update DuckDNS IP for court-app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dbar
+ExecStart=/home/dbar/court-app/server/duckdns-update.sh

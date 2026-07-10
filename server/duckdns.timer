@@ -1,0 +1,11 @@
+# Таймер, що оновлює DuckDNS IP кожні 5 хвилин.
+
+[Unit]
+Description=Run DuckDNS update every 5 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
