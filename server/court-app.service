@@ -1,0 +1,28 @@
+# systemd-сервіс для бекенду Court App.
+# Використовуйте, якщо у WSL увімкнено systemd (див. README-autostart.md).
+#
+# Встановлення:
+#   sudo cp court-app.service /etc/systemd/system/court-app.service
+#   # відредагуйте User= та шляхи під свого користувача
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now court-app
+#   systemctl status court-app     # перевірити
+#   journalctl -u court-app -f      # логи
+
+[Unit]
+Description=Court App backend (FastAPI/uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dbar
+WorkingDirectory=/home/dbar/court-app/backend
+ExecStart=/home/dbar/court-app/server/start-backend.sh
+Restart=on-failure
+RestartSec=5
+# Автоперезапуск і після мережевих збоїв
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
