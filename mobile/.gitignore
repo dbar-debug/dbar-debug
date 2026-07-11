@@ -15,10 +15,16 @@ build/
 # (не комітимо, поки не буде потреби в кастомних нативних налаштуваннях)
 /android/
 /ios/
-/web/
 /macos/
 /linux/
 /windows/
+
+# web/ генерується локально, але manifest/index беремо під git
+# для брендування PWA (решта — іконки тощо — лишається локальною)
+/web/*
+!/web/manifest.json
+!/web/index.html
+!/web/README-pwa.md
 
 # IDE
 .vscode/
