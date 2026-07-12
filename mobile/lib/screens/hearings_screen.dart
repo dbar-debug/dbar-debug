@@ -76,21 +76,62 @@ class _HearingsScreenState extends State<HearingsScreen> {
       );
     }
 
-    // Групуємо по днях
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Розділяємо на майбутні (включно з сьогодні) та минулі
+    final future = _hearings.where((h) => !h.date.isBefore(today)).toList();
+    final past = _hearings.where((h) => h.date.isBefore(today)).toList();
+
+    final children = <Widget>[];
+
+    if (future.isNotEmpty) {
+      // Майбутні — за зростанням дати (найближче зверху)
+      _appendGrouped(children, future, ascending: true);
+    }
+
+    if (past.isNotEmpty) {
+      children.add(_sectionHeader('МИНУЛІ'));
+      // Минулі — за спаданням дати (найновіше зверху)
+      _appendGrouped(children, past, ascending: false);
+    }
+
+    return ListView(padding: const EdgeInsets.only(bottom: 24), children: children);
+  }
+
+  /// Групує засідання по днях і додає заголовок дня + картки у [out].
+  void _appendGrouped(List<Widget> out, List<Hearing> items, {required bool ascending}) {
     final byDay = <DateTime, List<Hearing>>{};
-    for (final h in _hearings) {
+    for (final h in items) {
       byDay.putIfAbsent(h.date, () => []).add(h);
     }
     final days = byDay.keys.toList()..sort();
-
-    final children = <Widget>[];
+    if (!ascending) {
+      final reversed = days.reversed.toList();
+      days
+        ..clear()
+        ..addAll(reversed);
+    }
     for (final day in days) {
-      children.add(_dayHeader(day));
+      out.add(_dayHeader(day));
       for (final h in byDay[day]!) {
-        children.add(_hearingCard(h));
+        out.add(_hearingCard(h));
       }
     }
-    return ListView(padding: const EdgeInsets.only(bottom: 24), children: children);
+  }
+
+  Widget _sectionHeader(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              letterSpacing: 1,
+            ),
+      ),
+    );
   }
 
   Widget _dayHeader(DateTime day) {
