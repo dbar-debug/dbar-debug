@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/cabinet_screen.dart';
 import 'screens/hearings_screen.dart';
-import 'screens/search_screen.dart';
+import 'screens/person_search_screen.dart';
 import 'screens/settings_screen.dart';
 
 void main() {
@@ -45,7 +45,7 @@ class _HomeTabsState extends State<HomeTabs> {
   static const _screens = [
     CabinetScreen(),
     HearingsScreen(),
-    SearchScreen(),
+    PersonSearchScreen(),
     SettingsScreen(),
   ];
 

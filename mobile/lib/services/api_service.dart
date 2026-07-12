@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/court_case.dart';
+import '../models/person_case.dart';
 
 const _defaultBaseUrl = 'https://court-app.duckdns.org';
 const _baseUrlPrefKey = 'backend_base_url';
@@ -126,6 +127,35 @@ class ApiService {
         .map(Hearing.fromJson)
         .toList();
     return hearings;
+  }
+
+  /// Обʼєднаний перелік справ людини за ПІБ (стан + засідання) — /person/cases.
+  Future<List<PersonCase>> getPersonCases(String name) async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/person/cases').replace(queryParameters: {'name': name});
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final body = _decodeOrThrow(response);
+
+    return (body['cases'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(PersonCase.fromJson)
+        .toList();
+  }
+
+  /// Рішення ЄДРСР за номером справи — /decisions/by-case.
+  Future<List<Decision>> getDecisionsByCase(String caseNumber) async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/decisions/by-case')
+        .replace(queryParameters: {'number': caseNumber});
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final body = _decodeOrThrow(response);
+
+    return (body['decisions'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Decision.fromJson)
+        .toList();
   }
 
   Map<String, dynamic> _decodeOrThrow(http.Response response) {
