@@ -70,7 +70,17 @@ def _decode(raw: bytes):
 
 
 def _print_csv_sample(raw: bytes):
+    # Бінарні формати (xlsx = zip, тощо) не є CSV
+    if raw[:2] == b"PK":
+        print("Формат: XLSX/ZIP (Excel/архів) — потрібен окремий парсер (openpyxl).")
+        return
+    if raw.lstrip()[:1] in (b"{", b"["):
+        print("Формат: JSON. Перші символи:")
+        print("  " + raw.decode("utf-8", "replace")[:800])
+        return
+
     text, enc = _decode(raw)
+    text = text.replace("\x00", "")  # прибираємо NUL, щоб csv не падав
     first = text.split("\n", 1)[0]
     counts = {"\t": first.count("\t"), ";": first.count(";"), ",": first.count(",")}
     delim = max(counts, key=counts.get) if max(counts.values()) > 0 else ","
