@@ -112,6 +112,22 @@ class ApiService {
     return hearings;
   }
 
+  /// Пошук засідань за ПІБ у відкритих даних (без КЕП) — /hearings/by-name.
+  Future<List<Hearing>> getHearingsByName(String name) async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/hearings/by-name')
+        .replace(queryParameters: {'name': name});
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final body = _decodeOrThrow(response);
+
+    final hearings = (body['hearings'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Hearing.fromJson)
+        .toList();
+    return hearings;
+  }
+
   Map<String, dynamic> _decodeOrThrow(http.Response response) {
     Map<String, dynamic> body;
     try {
