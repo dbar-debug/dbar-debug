@@ -1,0 +1,28 @@
+# systemd-сервіс: оновлює локальний індекс Єдиного державного реєстру
+# (ЄДР) — ФОП та юрособи. Важкий (архіви Deflate64, XML на кілька ГБ),
+# розпаковується потоково через 7z. Набір оновлюється раз на тиждень,
+# тож таймер — щотижневий.
+#
+# Потрібен p7zip:  sudo apt install -y p7zip-full
+#
+# Встановлення:
+#   sudo cp edr-import.service /etc/systemd/system/
+#   sudo cp edr-import.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now edr-import.timer
+#   sudo systemctl start edr-import.service   # перший імпорт одразу
+#   journalctl -u edr-import -f
+
+[Unit]
+Description=Оновлення індексу ЄДР (ФОП/юрособи, відкриті дані)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dbar
+WorkingDirectory=/home/dbar/court-app/backend
+Environment=PATH=/home/dbar/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Типово імпортуємо лише ФОП; додати юрособи: --parts fop,uo
+ExecStart=/usr/bin/python3 import_edr.py
+TimeoutStartSec=14400

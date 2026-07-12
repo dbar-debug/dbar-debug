@@ -1,0 +1,13 @@
+# systemd-таймер: щотижневе оновлення індексу ЄДР (набір оновлюється
+# раз на тиждень). Понеділок, 04:30.
+
+[Unit]
+Description=Щотижневе оновлення індексу ЄДР (ФОП/юрособи)
+
+[Timer]
+OnCalendar=Mon *-*-* 04:30:00
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

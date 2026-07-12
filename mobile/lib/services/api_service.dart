@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/court_case.dart';
 import '../models/debtor.dart';
+import '../models/edr_record.dart';
 import '../models/person_case.dart';
 
 const _defaultBaseUrl = 'https://court-app.duckdns.org';
@@ -178,6 +179,20 @@ class ApiService {
     return (body['debtors'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>()
         .map(Debtor.fromJson)
+        .toList();
+  }
+
+  /// Пошук у Єдиному державному реєстрі (ФОП/юрособи) — /edr/search.
+  Future<List<EdrRecord>> searchEdr(String q) async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/edr/search').replace(queryParameters: {'q': q});
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final body = _decodeOrThrow(response);
+
+    return (body['records'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(EdrRecord.fromJson)
         .toList();
   }
 

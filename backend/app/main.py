@@ -13,6 +13,7 @@ from app.hearings import get_hearings_for_cases, get_hearings_for_name
 from app.status import get_status_for_name
 from app import decisions_db
 from app import debtors_db
+from app import edr_db
 from app.models import SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
@@ -292,6 +293,30 @@ async def debtors_search(
         name_norm = " ".join(query.lower().split())
         rows = await asyncio.to_thread(debtors_db.query_by_name, name_norm)
     return {"total_found": len(rows), "debtors": rows}
+
+
+@app.get("/edr/search")
+async def edr_search(
+    q: str = Query(..., description="ПІБ / назва або код ЄДРПОУ", example="Барцуков Денис"),
+):
+    """
+    Пошук у Єдиному державному реєстрі юросіб та ФОП за ПІБ/найменуванням
+    або кодом ЄДРПОУ. Лише цифри → пошук за кодом, інакше за назвою (FTS).
+    Показує, чи є людина ФОП (а згодом — засновником/керівником юрособи).
+    """
+    query = q.strip()
+    if len(query) < 4:
+        raise HTTPException(status_code=400, detail="Введіть ПІБ/назву (мін. 4 символи) або код")
+    if not edr_db.available():
+        return {"total_found": 0, "records": []}
+
+    digits = query.replace(" ", "")
+    if digits.isdigit():
+        rows = await asyncio.to_thread(edr_db.query_by_code, digits)
+    else:
+        name_norm = " ".join(query.lower().split())
+        rows = await asyncio.to_thread(edr_db.query_by_name, name_norm)
+    return {"total_found": len(rows), "records": rows}
 
 
 @app.get("/decisions/by-case")

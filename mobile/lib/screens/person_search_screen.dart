@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/edr_record.dart';
 import '../models/person_case.dart';
 import '../services/api_service.dart';
 import '../widgets/state_views.dart';
@@ -19,6 +20,7 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
   final _controller = TextEditingController();
 
   List<PersonCase> _cases = [];
+  List<EdrRecord> _edr = [];
   bool _loading = false;
   String? _error;
   bool _searched = false;
@@ -44,8 +46,15 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
       _searched = true;
     });
     try {
-      final cases = await _api.getPersonCases(name);
-      setState(() => _cases = cases);
+      // Бізнес-довідка (ЄДР) — допоміжна: не валимо весь пошук, якщо її нема.
+      final results = await Future.wait([
+        _api.getPersonCases(name),
+        _api.searchEdr(name).catchError((_) => <EdrRecord>[]),
+      ]);
+      setState(() {
+        _cases = results[0] as List<PersonCase>;
+        _edr = results[1] as List<EdrRecord>;
+      });
     } on Exception catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -109,21 +118,111 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
     if (!_searched) {
       return const EmptyStateView(
         icon: Icons.person_search,
-        message: 'Введіть ПІБ, щоб знайти справи, засідання та рішення',
+        message: 'Введіть ПІБ, щоб знайти справи, засідання, рішення та бізнес (ФОП)',
       );
     }
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_cases.isEmpty) {
-      return const EmptyStateView(icon: Icons.folder_off, message: 'Справ за цим ПІБ не знайдено');
+    if (_cases.isEmpty && _edr.isEmpty) {
+      return const EmptyStateView(
+          icon: Icons.folder_off, message: 'Справ і бізнесу за цим ПІБ не знайдено');
     }
+    // Спершу блок «Бізнес» (ЄДР), далі судові справи.
+    final hasEdr = _edr.isNotEmpty;
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: _cases.length,
-      itemBuilder: (context, i) => _caseCard(_cases[i]),
+      itemCount: (hasEdr ? _edr.length + 1 : 0) +
+          (_cases.isNotEmpty ? _cases.length + 1 : 0),
+      itemBuilder: (context, i) {
+        if (hasEdr) {
+          if (i == 0) return _sectionHeader('Бізнес', Icons.storefront);
+          if (i <= _edr.length) return _edrCard(_edr[i - 1]);
+          final j = i - (_edr.length + 1);
+          if (j == 0) return _sectionHeader('Судові справи', Icons.gavel);
+          return _caseCard(_cases[j - 1]);
+        }
+        if (i == 0) return _sectionHeader('Судові справи', Icons.gavel);
+        return _caseCard(_cases[i - 1]);
+      },
     );
   }
+
+  Widget _sectionHeader(String title, IconData icon) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Row(children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(title,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary)),
+        ]),
+      );
+
+  Widget _edrCard(EdrRecord r) {
+    final scheme = Theme.of(context).colorScheme;
+    final statusColor = r.isActive ? Colors.green : scheme.onSurfaceVariant;
+    final typeLabel = r.kind == 'ФОП'
+        ? 'ФОП'
+        : (r.role.isNotEmpty ? r.role : 'Юрособа');
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(r.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                _badge(typeLabel, scheme.primary),
+              ],
+            ),
+            if (r.orgName.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(r.orgName, style: Theme.of(context).textTheme.bodySmall),
+            ],
+            const SizedBox(height: 6),
+            Wrap(spacing: 12, runSpacing: 2, children: [
+              if (r.stan.isNotEmpty)
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.circle, size: 10, color: statusColor),
+                  const SizedBox(width: 4),
+                  Text(r.stan,
+                      style: TextStyle(color: statusColor, fontSize: 12)),
+                ]),
+              if (r.code.isNotEmpty)
+                Text('ЄДРПОУ ${r.code}',
+                    style: Theme.of(context).textTheme.bodySmall),
+              if (r.regDate.isNotEmpty)
+                Text('з ${r.regDate}',
+                    style: Theme.of(context).textTheme.bodySmall),
+            ]),
+            if (r.extra.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(r.extra, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _badge(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(text,
+            style: TextStyle(
+                color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+      );
 
   Widget _caseCard(PersonCase c) {
     final scheme = Theme.of(context).colorScheme;
