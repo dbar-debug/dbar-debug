@@ -71,16 +71,21 @@ def _sample_resource(url: str):
         return
 
     if url.lower().endswith(".zip"):
-        print("Тип: ZIP — розпаковую перший CSV усередині...")
+        print("Тип: ZIP — розпаковую найбільший CSV усередині...")
         raw = _get(url)
         zf = zipfile.ZipFile(io.BytesIO(raw))
-        names = zf.namelist()
-        print(f"Файли в архіві: {names}")
-        csv_name = next((n for n in names if n.lower().endswith(".csv")), names[0] if names else None)
-        if not csv_name:
+        infos = zf.infolist()
+        print("Файли в архіві (розмір розпакований):")
+        for zi in infos:
+            print(f"  {zi.filename}  —  {_human(zi.file_size)}")
+        csv_infos = [zi for zi in infos if zi.filename.lower().endswith(".csv")]
+        if not csv_infos:
             print("У архіві немає CSV.")
             return
-        with zf.open(csv_name) as f:
+        # Найбільший CSV = головний файл даних (довідники малі)
+        biggest = max(csv_infos, key=lambda zi: zi.file_size)
+        print(f"\nБеру найбільший: {biggest.filename} ({_human(biggest.file_size)})")
+        with zf.open(biggest.filename) as f:
             chunk = f.read(262144)
     else:
         req = urllib.request.Request(url, headers={"User-Agent": UA})
