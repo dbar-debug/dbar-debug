@@ -193,6 +193,81 @@ async def status_by_name(
     return {"total_found": len(cases), "cases": cases}
 
 
+@app.get("/person/cases")
+async def person_cases(
+    name: str = Query(..., description="ПІБ особи", example="Барцуков Денис Станіславович"),
+):
+    """
+    Обʼєднаний перелік справ людини за ПІБ: зливає СТАН справ (поточна
+    стадія) і ЗАСІДАННЯ (розклад) за номером справи. Рішення підтягуються
+    окремо (/decisions/by-case) на вимогу. Без КЕП.
+    """
+    if len(name.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Введіть повне ПІБ (мінімум 5 символів)")
+
+    status_cases = await get_status_for_name(name.strip())
+    hearings = await get_hearings_for_name(name.strip())
+
+    # Зводимо все за номером справи
+    cases: dict = {}
+
+    def _slot(num: str) -> dict:
+        return cases.setdefault(num, {
+            "case_number": num,
+            "court_name": "",
+            "judge": "",
+            "participants": "",
+            "description": "",
+            "stage_name": "",
+            "stage_date": "",
+            "hearings": [],
+            "next_hearing": None,
+        })
+
+    for c in status_cases:
+        num = c.get("case_number") or ""
+        if not num:
+            continue
+        s = _slot(num)
+        s["court_name"] = c.get("court_name") or s["court_name"]
+        s["judge"] = c.get("judge") or s["judge"]
+        s["participants"] = c.get("participants") or s["participants"]
+        s["description"] = c.get("description") or s["description"]
+        s["stage_name"] = c.get("stage_name") or ""
+        s["stage_date"] = c.get("stage_date") or ""
+
+    for h in hearings:
+        num = h.get("case_number") or ""
+        if not num:
+            continue
+        s = _slot(num)
+        s["court_name"] = s["court_name"] or (h.get("court_name") or "")
+        s["judge"] = s["judge"] or (h.get("judges") or "")
+        s["participants"] = s["participants"] or (h.get("case_involved") or "")
+        s["description"] = s["description"] or (h.get("case_description") or "")
+        s["hearings"].append({
+            "date": h.get("date") or "",
+            "time": h.get("time") or "",
+            "court_room": h.get("court_room") or "",
+        })
+
+    # Найближче майбутнє засідання по кожній справі
+    import datetime
+    today = datetime.date.today().isoformat()
+    for s in cases.values():
+        s["hearings"].sort(key=lambda x: (x["date"], x["time"]))
+        future = [h for h in s["hearings"] if h["date"] >= today]
+        s["next_hearing"] = future[0] if future else None
+
+    # Сортуємо справи: спершу з майбутнім засіданням (найближче), потім за стадією
+    def _sort_key(s):
+        nh = s["next_hearing"]["date"] if s["next_hearing"] else "9999"
+        return (nh, )
+
+    result = sorted(cases.values(), key=_sort_key)
+    return {"total_found": len(result), "cases": result}
+
+
 @app.get("/decisions/by-case")
 async def decisions_by_case(
     number: str = Query(..., description="Номер справи", example="754/899/26"),

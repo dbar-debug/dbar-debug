@@ -109,7 +109,10 @@ def query_by_case(cause_num: str) -> List[dict]:
         out = []
         for r in cur.fetchall():
             d = dict(r)
-            d["text_url"] = d.get("doc_url") or (REVIEW_URL + d["doc_id"] if d.get("doc_id") else "")
+            doc_id = d.get("doc_id") or ""
+            # HTML-сторінка рішення (для перегляду) + пряме .rtf (для збереження)
+            d["review_url"] = (REVIEW_URL + doc_id) if doc_id else (d.get("doc_url") or "")
+            d["file_url"] = d.get("doc_url") or ""
             out.append(d)
         return out
     finally:
