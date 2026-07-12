@@ -9,6 +9,7 @@ from app.cabinet_auth import get_session, clear_session
 from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events, get_cabinet_hearings
 from app.hearings import get_hearings_for_cases, get_hearings_for_name
 from app.status import get_status_for_name
+from app import decisions_db
 from app.models import SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
@@ -190,6 +191,23 @@ async def status_by_name(
         raise HTTPException(status_code=400, detail="Введіть повне ПІБ (мінімум 5 символів)")
     cases = await get_status_for_name(name.strip())
     return {"total_found": len(cases), "cases": cases}
+
+
+@app.get("/decisions/by-case")
+async def decisions_by_case(
+    number: str = Query(..., description="Номер справи", example="754/899/26"),
+):
+    """
+    Рішення ЄДРСР за номером справи (текст — за посиланням text_url).
+    Публічний, без КЕП.
+    """
+    import asyncio
+    if not number.strip():
+        raise HTTPException(status_code=400, detail="Вкажіть номер справи")
+    if not decisions_db.available():
+        return {"total_found": 0, "decisions": []}
+    decisions = await asyncio.to_thread(decisions_db.query_by_case, number.strip())
+    return {"total_found": len(decisions), "decisions": decisions}
 
 
 @app.get("/cabinet/calendar")

@@ -1,0 +1,12 @@
+# systemd-таймер: щоденне оновлення індексу рішень ЄДРСР (о 05:00).
+
+[Unit]
+Description=Щоденне оновлення індексу рішень ЄДРСР
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

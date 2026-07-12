@@ -1,0 +1,23 @@
+# systemd-сервіс: оновлює локальний індекс рішень ЄДРСР (за номером
+# справи) з відкритих даних. Запускається таймером раз на добу.
+#
+# Встановлення:
+#   sudo cp decisions-import.service /etc/systemd/system/
+#   sudo cp decisions-import.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now decisions-import.timer
+#   sudo systemctl start decisions-import.service   # перший імпорт одразу
+#   journalctl -u decisions-import -f
+
+[Unit]
+Description=Оновлення індексу рішень ЄДРСР (відкриті дані)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dbar
+WorkingDirectory=/home/dbar/court-app/backend
+Environment=PATH=/home/dbar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 import_decisions.py
+TimeoutStartSec=3600
