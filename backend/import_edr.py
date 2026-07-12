@@ -18,6 +18,7 @@ Python (zlib/zipfile) НЕ вміє розпакувати. Тому розпа�
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,58 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from app import edr_db
+
+# Держ-XML часто містить символи/посилання, недійсні в XML 1.0 (керуючі
+# коди на кшталт &#4; або сирий байт 0x0B). ElementTree на них падає, тож
+# чистимо потік на льоту. Числові посилання — ASCII, а cp1251 однобайтне,
+# тож безпечно фільтрувати на рівні байтів.
+_BAD_REF = re.compile(rb"&#(x[0-9a-fA-F]+|[0-9]+);")
+# Недійсні керуючі байти (усе 0x00–0x1F, окрім TAB/LF/CR):
+_DROP_BYTES = bytes(b for b in range(0x20) if b not in (0x09, 0x0A, 0x0D))
+
+
+def _valid_cp(cp: int) -> bool:
+    return (cp in (0x9, 0xA, 0xD) or 0x20 <= cp <= 0xD7FF
+            or 0xE000 <= cp <= 0xFFFD or 0x10000 <= cp <= 0x10FFFF)
+
+
+def _fix_ref(m: "re.Match") -> bytes:
+    body = m.group(1)
+    cp = int(body[1:], 16) if body[:1] in (b"x", b"X") else int(body)
+    return m.group(0) if _valid_cp(cp) else b""
+
+
+class _XmlSanitizer:
+    """Файл-обгортка: видаляє недійсні керуючі байти й числові посилання,
+    зберігаючи «хвіст» на межі чанків, щоб не розрізати &#...; навпіл."""
+
+    def __init__(self, raw):
+        self.raw = raw
+        self.tail = b""
+
+    def _clean(self, data: bytes) -> bytes:
+        if not data:
+            return data
+        data = data.translate(None, _DROP_BYTES)
+        return _BAD_REF.sub(_fix_ref, data)
+
+    def read(self, size=65536) -> bytes:
+        while True:
+            chunk = self.raw.read(size)
+            if not chunk:
+                data, self.tail = self.tail, b""
+                return self._clean(data)  # порожньо → справжній кінець
+            data = self.tail + chunk
+            amp = data.rfind(b"&")
+            # притримуємо незавершене &#... (без ;) до наступного читання
+            if amp != -1 and b";" not in data[amp:] and len(data) - amp < 16:
+                self.tail, data = data[amp:], data[:amp]
+            else:
+                self.tail = b""
+            cleaned = self._clean(data)
+            if cleaned:
+                return cleaned
+            # інакше читаємо далі, щоб не віддати передчасний EOF
 
 DATASET_ID = os.getenv("EDR_DATASET_ID", "a1799820-195b-4982-8141-6e84f58103e7")
 UA = "Mozilla/5.0 (court-app; +personal use)"
@@ -90,7 +143,7 @@ def _xml_stream(zip_path: str, member: str):
 
 def _iter_subjects(proc):
     """Потоковий парсинг <SUBJECT>…</SUBJECT> з очищенням памʼяті."""
-    context = ET.iterparse(proc.stdout, events=("start", "end"))
+    context = ET.iterparse(_XmlSanitizer(proc.stdout), events=("start", "end"))
     _, root = next(context)  # кореневий <DATA>
     for event, elem in context:
         if event == "end" and elem.tag == "SUBJECT":
