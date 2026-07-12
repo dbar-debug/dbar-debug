@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.scraper import search_by_name
 from app.cabinet_auth import get_session, clear_session
 from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events, get_cabinet_hearings
-from app.hearings import get_hearings_for_cases
+from app.hearings import get_hearings_for_cases, get_hearings_for_name
 from app.models import SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
@@ -159,6 +159,21 @@ def _merge_hearings(preferred: list[dict], other: list[dict]) -> list[dict]:
     merged = list(by_key.values())
     merged.sort(key=lambda h: (h["date"], h["time"]))
     return merged
+
+
+@app.get("/hearings/by-name")
+async def hearings_by_name(
+    name: str = Query(..., description="ПІБ особи", example="Барцуков Денис Станіславович"),
+):
+    """
+    Публічний пошук судових засідань за ПІБ у відкритих даних
+    'Список справ призначених до розгляду'. Без КЕП — для будь-якого
+    користувача. Повертає засідання, де імʼя фігурує серед учасників.
+    """
+    if len(name.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Введіть повне ПІБ (мінімум 5 символів)")
+    hearings = await get_hearings_for_name(name.strip())
+    return {"total_found": len(hearings), "hearings": hearings}
 
 
 @app.get("/cabinet/calendar")

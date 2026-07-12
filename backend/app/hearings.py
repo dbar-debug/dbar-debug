@@ -60,7 +60,46 @@ async def get_hearings_for_cases(case_numbers: List[str]) -> List[dict]:
     return hearings
 
 
+async def get_hearings_for_name(full_name: str) -> List[dict]:
+    """
+    Повертає засідання, де ПІБ зустрічається серед учасників справи —
+    для мультиюзерного пошуку за іменем (без КЕП/кабінету).
+    """
+    name_norm = _normalize(full_name)
+    if len(name_norm) < 5:
+        return []
+
+    key = "name:" + name_norm
+    cached = _cache.get(key)
+    if cached and (time.time() - cached[0]) < _CACHE_TTL:
+        print(f"[hearings] Кеш (імʼя): {len(cached[1])} засідань")
+        return cached[1]
+
+    hearings = await asyncio.to_thread(_download_and_filter_by_name, name_norm)
+    _cache[key] = (time.time(), hearings)
+    return hearings
+
+
 def _download_and_filter(numbers: Set[str]) -> List[dict]:
+    hearings = _stream_and_collect(lambda row: row[2].strip() in numbers)
+    print(f"[hearings] Знайдено {len(hearings)} засідань для {len(numbers)} справ")
+    return hearings
+
+
+def _download_and_filter_by_name(name_norm: str) -> List[dict]:
+    """Фільтр за ПІБ: імʼя має зустрічатись серед учасників справи (row[5])."""
+    hearings = _stream_and_collect(
+        lambda row: name_norm in _normalize(row[5])
+    )
+    print(f"[hearings] Знайдено {len(hearings)} засідань для «{name_norm}»")
+    return hearings
+
+
+def _stream_and_collect(predicate) -> List[dict]:
+    """
+    Потоково читає CSV і збирає засідання для рядків, що проходять predicate.
+    Дедуплікує за (номер справи, дата, час) і сортує за датою/часом.
+    """
     url = _resolve_csv_url()
     print(f"[hearings] Завантажую CSV: {url}")
     hearings: List[dict] = []
@@ -74,9 +113,9 @@ def _download_and_filter(numbers: Set[str]) -> List[dict]:
             for row in reader:
                 if len(row) < 7:
                     continue
-                case = row[2].strip()
-                if case not in numbers:
+                if not predicate(row):
                     continue
+                case = row[2].strip()
                 date_iso, htime = _split_date_time(row[0].strip())
                 dedup = (case, date_iso, htime)
                 if dedup in seen:
@@ -96,8 +135,12 @@ def _download_and_filter(numbers: Set[str]) -> List[dict]:
         print(f"[hearings] Помилка завантаження/парсингу: {e}")
 
     hearings.sort(key=lambda h: (h["date"], h["time"]))
-    print(f"[hearings] Знайдено {len(hearings)} засідань для {len(numbers)} справ")
     return hearings
+
+
+def _normalize(s: str) -> str:
+    """Нормалізація для порівняння імен: нижній регістр, стиснені пробіли."""
+    return " ".join((s or "").lower().split())
 
 
 def _resolve_csv_url() -> str:
