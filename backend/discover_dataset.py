@@ -69,12 +69,34 @@ def _decode(raw: bytes):
     return u, "utf-8"
 
 
+def _print_xml_sample(raw: bytes):
+    """Показує реальну структуру XML: перші ~7000 символів (корінь + перші
+    записи) і список тегів, що трапляються, з частотою — щоб знати назви
+    елементів перед написанням iterparse-імпортера."""
+    import re
+    from collections import Counter
+
+    text, enc = _decode(raw)
+    print(f"Кодування: {enc} | Формат: XML\n")
+    print("ПОЧАТОК XML (корінь + перші записи):")
+    print(text[:7000])
+    tags = re.findall(r"<([A-Za-zА-Яа-я_][\w:.-]*)", text)
+    freq = Counter(tags)
+    print("\nТЕГИ, що трапляються (тег: кількість у зразку):")
+    for tag, n in freq.most_common(40):
+        print(f"  <{tag}>  ×{n}")
+
+
 def _print_csv_sample(raw: bytes):
     # Бінарні формати (xlsx = zip, тощо) не є CSV
     if raw[:2] == b"PK":
         print("Формат: XLSX/ZIP (Excel/архів) — потрібен окремий парсер (openpyxl).")
         return
-    if raw.lstrip()[:1] in (b"{", b"["):
+    stripped = raw.lstrip()
+    if stripped[:5].lower() == b"<?xml" or stripped[:1] == b"<":
+        _print_xml_sample(raw)
+        return
+    if stripped[:1] in (b"{", b"["):
         print("Формат: JSON. Перші символи:")
         print("  " + raw.decode("utf-8", "replace")[:800])
         return
@@ -149,14 +171,17 @@ def _sample_resource(url: str):
     print(f"Розмір (Content-Length): {_human(size)}")
 
     if url.lower().endswith(".zip"):
-        # Великі архіви семплимо потоково (перший файл), малі — повністю
-        if size and size > SAMPLE_SIZE_LIMIT:
-            print("Тип: ZIP (великий) — потокова вибірка першого файлу...")
-            if _stream_sample_zip(url):
-                return
-            print("Потокова вибірка не вдалась — потрібне повне завантаження.")
+        # Спершу пробуємо потокову вибірку першого файлу — працює для будь-
+        # якого розміру й для XML (усередині можуть бути гігабайтні файли).
+        print("Тип: ZIP — потокова вибірка першого файлу в архіві...")
+        if _stream_sample_zip(url):
             return
-        print("Тип: ZIP — розпаковую найбільший CSV усередині...")
+        # Не вдалось (напр., zip64/незвичний метод): для малих архівів
+        # завантажуємо повністю й шукаємо CSV усередині.
+        if size and size > SAMPLE_SIZE_LIMIT:
+            print("Потокова вибірка не вдалась, а архів завеликий для повного завантаження.")
+            return
+        print("Потокова вибірка не вдалась — завантажую архів повністю...")
         raw = _get(url)
         zf = zipfile.ZipFile(io.BytesIO(raw))
         infos = zf.infolist()
