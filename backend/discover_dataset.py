@@ -142,6 +142,10 @@ def main():
             _sample_resource(newest["url"])
         return
 
+    if args[0] == "--url":
+        _sample_resource(args[1])
+        return
+
     query = args[0]
     print(f"Пошук набору: {query}\n")
     api = "https://data.gov.ua/api/3/action/package_search?q=" + urllib.parse.quote(query) + "&rows=10"
