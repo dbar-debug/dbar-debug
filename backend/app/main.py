@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app.scraper import search_by_name
 from app.cabinet_auth import get_session, clear_session
-from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events
+from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events, get_cabinet_hearings
 from app.hearings import get_hearings_for_cases
 from app.models import SearchResult
 
@@ -136,10 +136,29 @@ async def cabinet_hearings():
         session = await get_session(kep_file, password)
         result = await get_my_cases(session)
         numbers = [c.case_number for c in result.cases if c.case_number and c.case_number != "—"]
-        hearings = await get_hearings_for_cases(numbers)
+
+        # Майбутні — з відкритих даних (є зал/суть спору); минулі та всі
+        # інші — з руху справ у кабінеті. Зливаємо, надаючи перевагу
+        # запису з відкритих даних (він багатший) при збігу.
+        future = await get_hearings_for_cases(numbers)
+        past = await get_cabinet_hearings(session)
+        hearings = _merge_hearings(future, past)
         return {"total_found": len(hearings), "hearings": hearings}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _merge_hearings(preferred: list[dict], other: list[dict]) -> list[dict]:
+    """Зливає два списки засідань, дедуплікуючи за (справа, дата, час).
+    При збігу лишається запис з `preferred` (детальніший)."""
+    by_key: dict = {}
+    for h in other:
+        by_key[(h["case_number"], h["date"], h["time"])] = h
+    for h in preferred:
+        by_key[(h["case_number"], h["date"], h["time"])] = h
+    merged = list(by_key.values())
+    merged.sort(key=lambda h: (h["date"], h["time"]))
+    return merged
 
 
 @app.get("/cabinet/calendar")

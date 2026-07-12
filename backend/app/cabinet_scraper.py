@@ -246,6 +246,118 @@ async def get_calendar_events(session: dict) -> List[dict]:
     return events
 
 
+async def get_cabinet_hearings(session: dict) -> List[dict]:
+    """
+    Судові засідання з руху справ у кабінеті. Документи типу
+    'Внесення дат слухання' мають у полі docDate реальну дату й час
+    засідання (місцевий київський час, попри суфікс 'Z'). Це головне
+    джерело МИНУЛИХ засідань, яких немає у відкритому наборі даних.
+
+    Кожне засідання збагачуємо судом/суддями/сторонами зі справи, щоб
+    формат збігався з засіданнями з відкритих даних (Hearing).
+    """
+    cookies = session.get("cookies") or []
+    token = (session.get("local_storage") or {}).get("token", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    hearings: List[dict] = []
+    async with async_playwright() as pw:
+        api = await pw.request.new_context(
+            storage_state={"cookies": cookies, "origins": []},
+            extra_http_headers=headers,
+        )
+        try:
+            courts = await _get_dictionary(api, "/api/dictionaries/courts", key="name")
+            member_roles = await _get_dictionary(api, "/api/dictionaries/cases/member_roles", key="description")
+            judge_roles = await _get_dictionary(api, "/api/dictionaries/cases/judge_roles", key="description")
+            raw_cases = await _get_my_cases_raw(api)
+
+            for case in raw_cases:
+                case_id = case.get("id", "")
+                case_number = case.get("number", "—")
+                court_name = courts.get(case.get("courtId"), "—")
+                involved = _members_summary(case, member_roles)
+                judges = _judges_summary(case, judge_roles)
+
+                seen = set()
+                start = 0
+                page_size = 100
+                while True:
+                    resp = await api.get(
+                        f"{CABINET_URL}/api/documents/case",
+                        params={
+                            "case_id": case_id,
+                            "start": start,
+                            "count": page_size,
+                            "sort[docDate]": "desc",
+                            "is_not_deleted": 1,
+                        },
+                    )
+                    page = (await resp.json()).get("data") or []
+                    for d in page:
+                        if (d.get("description") or "") != "Внесення дат слухання":
+                            continue
+                        doc_date = d.get("docDate") or ""
+                        if len(doc_date) < 10:
+                            continue
+                        date_iso = doc_date[:10]                 # YYYY-MM-DD
+                        htime = doc_date[11:16] if len(doc_date) >= 16 else ""  # HH:MM (місцевий)
+                        dedup = (date_iso, htime)
+                        if dedup in seen:
+                            continue
+                        seen.add(dedup)
+                        hearings.append({
+                            "date": date_iso,
+                            "time": htime,
+                            "case_number": case_number,
+                            "court_name": court_name,
+                            "judges": judges,
+                            "case_involved": involved,
+                            "case_description": "",
+                            "court_room": "",
+                        })
+                    if len(page) < page_size:
+                        break
+                    start += page_size
+        finally:
+            await api.dispose()
+
+    print(f"[cabinet] Засідань з руху справ: {len(hearings)}")
+    return hearings
+
+
+def _members_summary(raw: dict, member_roles: dict) -> str:
+    """'Позивач: X, Відповідач: Y' зі складу учасників справи."""
+    parts = []
+    seen = set()
+    for m in raw.get("caseMembers") or []:
+        name = m.get("name") or m.get("companyName") or ""
+        role = member_roles.get(m.get("roleId"), "")
+        if not name:
+            continue
+        key = (role, name)
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append(f"{role}: {name}" if role else name)
+    return ", ".join(parts)
+
+
+def _judges_summary(raw: dict, judge_roles: dict) -> str:
+    """'Головуючий суддя: X' зі складу суду."""
+    names = []
+    seen = set()
+    for j in raw.get("caseJudges") or []:
+        name = j.get("name") or ""
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    if not names:
+        return ""
+    return "Головуючий суддя: " + ", ".join(names)
+
+
 async def get_document_file(session: dict, doc_id: str) -> tuple[bytes, str]:
     """
     Повертає (вміст_файлу, content_type) документа через
