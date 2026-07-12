@@ -106,9 +106,15 @@ def _sample_resource(url: str):
 
 
 def _newest_resource(resources):
-    """Найсвіжіший ресурс: спершу датований снепшот (vid-...), інакше останній."""
-    dated = [r for r in resources if "vid-" in (r.get("name") or "").lower()]
-    pool = dated or resources
+    """Найсвіжіший ДАНИЙ ресурс (csv/zip), ігноруючи readme/pdf."""
+    data_res = [
+        r for r in resources
+        if (r.get("format") or "").upper() in ("CSV", "ZIP")
+        or (r.get("url") or "").lower().endswith((".csv", ".zip"))
+    ]
+    pool = data_res or resources
+    dated = [r for r in pool if "vid-" in (r.get("name") or "").lower()]
+    pool = dated or pool
     def keyf(r):
         return r.get("last_modified") or r.get("created") or ""
     return max(pool, key=keyf) if pool else None
