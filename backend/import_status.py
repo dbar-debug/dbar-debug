@@ -7,7 +7,9 @@ zip у тимчасовий файл, потоково читаємо кожен
 у status_db.build (яка залишає останню стадію по кожній справі).
 
 Запуск вручну (backend/):
-    python3 import_status.py
+    python3 import_status.py                  # найсвіжіший файл (за package_show)
+    python3 import_status.py <url1> <url2> …  # конкретні денні файли (бекфіл)
+
 Автоматично — раз на добу через systemd-таймер (server/status-import.timer).
 """
 
@@ -15,6 +17,7 @@ import csv
 import io
 import json
 import os
+import sys
 import tempfile
 import time
 import urllib.request
@@ -63,14 +66,8 @@ def _iter_zip_rows(zip_path: str):
                     )
 
 
-def main():
-    t0 = time.time()
-    data_dir = os.path.dirname(status_db.DB_PATH) or "."
-    os.makedirs(data_dir, exist_ok=True)  # zip качаємо поряд із базою
-
-    url = _resolve_zip_url()
+def _import_one(url: str, data_dir: str, t0: float) -> int:
     print(f"[status] Завантажую zip: {url}")
-
     fd, tmp_zip = tempfile.mkstemp(suffix=".zip", dir=data_dir)
     os.close(fd)
     try:
@@ -81,14 +78,32 @@ def main():
                 if not chunk:
                     break
                 f.write(chunk)
-        print(f"[status] Завантажено {os.path.getsize(tmp_zip) / 1024 / 1024:.0f} МБ за {time.time()-t0:.0f}с")
-
-        count = status_db.merge(_iter_zip_rows(tmp_zip))
-        print(f"[status] Готово: у базі {count:,} унікальних справ (накопичувально) за {time.time()-t0:.0f}с")
-        print(f"[status] База: {status_db.DB_PATH}")
+        print(f"[status] Завантажено {os.path.getsize(tmp_zip) / 1024 / 1024:.0f} МБ "
+              f"({time.time()-t0:.0f}с). Зливаю...")
+        return status_db.merge(_iter_zip_rows(tmp_zip))
     finally:
         if os.path.exists(tmp_zip):
             os.remove(tmp_zip)
+
+
+def main():
+    t0 = time.time()
+    data_dir = os.path.dirname(status_db.DB_PATH) or "."
+    os.makedirs(data_dir, exist_ok=True)  # zip качаємо поряд із базою
+
+    # Явні URL (бекфіл кількома днями) або найсвіжіший файл за замовчуванням
+    urls = [a for a in sys.argv[1:] if a.startswith("http")]
+    if not urls:
+        urls = [_resolve_zip_url()]
+
+    count = 0
+    for i, url in enumerate(urls, 1):
+        print(f"\n=== Файл {i}/{len(urls)} ===")
+        count = _import_one(url, data_dir, t0)
+
+    print(f"\n[status] Готово: у базі {count:,} унікальних справ (накопичувально) "
+          f"за {time.time()-t0:.0f}с")
+    print(f"[status] База: {status_db.DB_PATH}")
 
 
 if __name__ == "__main__":
