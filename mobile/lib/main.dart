@@ -57,6 +57,9 @@ class _HomeTabsState extends State<HomeTabs> {
       body: _screens[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
+        // 5 вкладок — щоб довгі підписи не тіснились, показуємо підпис
+        // лише активної вкладки, решта — іконки.
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.folder_outlined), label: 'Справи'),
