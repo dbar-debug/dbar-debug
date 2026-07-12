@@ -164,6 +164,48 @@ def _stream_sample_zip(url: str) -> bool:
     return True
 
 
+def _download_to(url: str, path: str):
+    """Потоково завантажує url у файл (не тримаючи все в памʼяті)."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=1800) as resp, open(path, "wb") as f:
+        got = 0
+        while True:
+            chunk = resp.read(1 << 20)
+            if not chunk:
+                break
+            f.write(chunk)
+            got += len(chunk)
+    print(f"Завантажено {_human(got)} → {path}")
+
+
+def _sevenzip_read(zip_path: str, member: str, nbytes: int):
+    """Читає перші nbytes члена архіву через 7z (для Deflate64/методу 9)."""
+    import shutil
+    import subprocess
+
+    exe = next((e for e in ("7z", "7za", "7zr") if shutil.which(e)), None)
+    if not exe:
+        print("Метод 9 (Deflate64) — потрібен 7z. Встанови: sudo apt install p7zip-full")
+        return None
+    print(f"Розпаковую {member} через {exe} (Deflate64)...")
+    p = subprocess.Popen([exe, "e", "-so", zip_path, member],
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    try:
+        return p.stdout.read(nbytes)
+    finally:
+        p.stdout.close()
+        p.terminate()
+
+
+def _read_member(zf: zipfile.ZipFile, zip_path: str, member: str, nbytes: int = 262144):
+    """Перші nbytes члена: спершу stdlib, при Deflate64 — через 7z."""
+    try:
+        with zf.open(member) as f:
+            return f.read(nbytes)
+    except NotImplementedError:
+        return _sevenzip_read(zip_path, member, nbytes)
+
+
 def _sample_resource(url: str):
     """Показати заголовок і перші рядки CSV (розпакувавши zip за потреби)."""
     size = _content_length(url)
@@ -181,21 +223,30 @@ def _sample_resource(url: str):
         if size and size > SAMPLE_SIZE_LIMIT:
             print("Потокова вибірка не вдалась, а архів завеликий для повного завантаження.")
             return
-        print("Потокова вибірка не вдалась — завантажую архів повністю...")
-        raw = _get(url)
-        zf = zipfile.ZipFile(io.BytesIO(raw))
-        infos = zf.infolist()
-        print("Файли в архіві (розмір розпакований):")
-        for zi in infos:
-            print(f"  {zi.filename}  —  {_human(zi.file_size)}")
-        csv_infos = [zi for zi in infos if zi.filename.lower().endswith(".csv")]
-        if not csv_infos:
-            print("У архіві немає CSV.")
-            return
-        biggest = max(csv_infos, key=lambda zi: zi.file_size)
-        print(f"\nБеру найбільший: {biggest.filename} ({_human(biggest.file_size)})")
-        with zf.open(biggest.filename) as f:
-            _print_csv_sample(f.read(262144))
+        print("Потокова вибірка не вдалась — завантажую архів повністю на диск...")
+        import tempfile
+        fd, tmp = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+        try:
+            _download_to(url, tmp)
+            zf = zipfile.ZipFile(tmp)
+            infos = zf.infolist()
+            print("Файли в архіві (розпакований розмір, метод стиснення):")
+            for zi in infos:
+                print(f"  {zi.filename}  —  {_human(zi.file_size)}  (метод {zi.compress_type})")
+            data_infos = [zi for zi in infos
+                          if zi.filename.lower().endswith((".csv", ".xml", ".xsd", ".json"))]
+            pool = data_infos or [zi for zi in infos if not zi.is_dir()]
+            if not pool:
+                print("У архіві немає файлів даних.")
+                return
+            biggest = max(pool, key=lambda zi: zi.file_size)
+            print(f"\nБеру найбільший: {biggest.filename} ({_human(biggest.file_size)})")
+            raw = _read_member(zf, tmp, biggest.filename)
+            if raw is not None:
+                _print_csv_sample(raw)
+        finally:
+            os.remove(tmp)
         return
 
     req = urllib.request.Request(url, headers={"User-Agent": UA})
