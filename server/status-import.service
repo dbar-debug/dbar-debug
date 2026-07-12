@@ -1,0 +1,25 @@
+# systemd-сервіс: оновлює локальний індекс СТАНУ розгляду справ
+# (SQLite/FTS5) з відкритих даних. Важкий (~710 МБ zip, десятки млн
+# рядків), тож запускається таймером раз на добу вночі.
+#
+# Встановлення:
+#   sudo cp status-import.service /etc/systemd/system/
+#   sudo cp status-import.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now status-import.timer
+#   sudo systemctl start status-import.service    # перший імпорт одразу
+#   journalctl -u status-import -f
+
+[Unit]
+Description=Оновлення індексу стану розгляду справ (відкриті дані)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dbar
+WorkingDirectory=/home/dbar/court-app/backend
+Environment=PATH=/home/dbar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 import_status.py
+# Імпорт великий — даємо запас часу
+TimeoutStartSec=3600

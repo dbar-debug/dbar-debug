@@ -8,6 +8,7 @@ from app.scraper import search_by_name
 from app.cabinet_auth import get_session, clear_session
 from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events, get_cabinet_hearings
 from app.hearings import get_hearings_for_cases, get_hearings_for_name
+from app.status import get_status_for_name
 from app.models import SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
@@ -174,6 +175,21 @@ async def hearings_by_name(
         raise HTTPException(status_code=400, detail="Введіть повне ПІБ (мінімум 5 символів)")
     hearings = await get_hearings_for_name(name.strip())
     return {"total_found": len(hearings), "hearings": hearings}
+
+
+@app.get("/status/by-name")
+async def status_by_name(
+    name: str = Query(..., description="ПІБ особи", example="Барцуков Денис Станіславович"),
+):
+    """
+    Публічний пошук СТАНУ розгляду справ за ПІБ у відкритих даних
+    'Інформація щодо стану розгляду справ'. Повертає справи, де імʼя
+    фігурує серед сторін, з поточною стадією та результатом.
+    """
+    if len(name.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Введіть повне ПІБ (мінімум 5 символів)")
+    cases = await get_status_for_name(name.strip())
+    return {"total_found": len(cases), "cases": cases}
 
 
 @app.get("/cabinet/calendar")

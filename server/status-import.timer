@@ -1,0 +1,13 @@
+# systemd-таймер: щоденне оновлення індексу стану розгляду справ.
+# Запускаємо вночі (о 04:00), бо імпорт важкий і триває довше за засідання.
+
+[Unit]
+Description=Щоденне оновлення індексу стану розгляду справ
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target
