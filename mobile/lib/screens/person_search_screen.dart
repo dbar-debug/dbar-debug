@@ -163,9 +163,7 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
   Widget _edrCard(EdrRecord r) {
     final scheme = Theme.of(context).colorScheme;
     final statusColor = r.isActive ? Colors.green : scheme.onSurfaceVariant;
-    final typeLabel = r.kind == 'ФОП'
-        ? 'ФОП'
-        : (r.role.isNotEmpty ? r.role : 'Юрособа');
+    final typeLabel = r.kind == 'ФОП' ? 'ФОП' : 'Юрособа';
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Padding(
@@ -183,6 +181,12 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
                 _badge(typeLabel, scheme.primary),
               ],
             ),
+            if (r.role.isNotEmpty)
+              Text(r.role,
+                  style: TextStyle(
+                      color: scheme.tertiary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
             if (r.orgName.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(r.orgName, style: Theme.of(context).textTheme.bodySmall),

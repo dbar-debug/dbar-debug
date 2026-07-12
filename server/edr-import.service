@@ -23,6 +23,7 @@ Type=oneshot
 User=dbar
 WorkingDirectory=/home/dbar/court-app/backend
 Environment=PATH=/home/dbar/.local/bin:/usr/local/bin:/usr/bin:/bin
-# Типово імпортуємо лише ФОП; додати юрособи: --parts fop,uo
-ExecStart=/usr/bin/python3 import_edr.py
+# Імпортуємо ФОП + юрособи в один індекс (окремі запуски перезаписують
+# БД, тож обидві частини — разом). Лише ФОП: --parts fop
+ExecStart=/usr/bin/python3 import_edr.py --parts fop,uo
 TimeoutStartSec=14400

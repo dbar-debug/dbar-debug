@@ -181,10 +181,71 @@ def _fop_rows(zip_path: str):
         proc.wait()
 
 
+def _founder_person(text: str) -> str:
+    """«НУР АХМАД; розмір частки - 1000,00 грн.» → «НУР АХМАД» (або назва орг.)."""
+    return (text or "").split(";")[0].strip()
+
+
+def _signer_person_role(text: str):
+    """«БОРОДАЙ ЮРІЙ - керівник» → ('БОРОДАЙ ЮРІЙ', 'керівник');
+    «ЯКОВЕЦЬ ГАЛИНА; - представник» → ('ЯКОВЕЦЬ ГАЛИНА', 'представник')."""
+    t = (text or "").strip()
+    role = ""
+    if " - " in t:
+        left, role = t.rsplit(" - ", 1)
+    else:
+        left = t
+    return left.split(";")[0].strip(), role.strip()
+
+
+def _uo_rows(zip_path: str):
+    """Юрособи: сама компанія (NAME/EDRPOU) + засновники/підписанти за ПІБ.
+    <SUBJECT><NAME/><SHORT_NAME/><OPF/><EDRPOU/><STAN/>
+             <FOUNDERS><FOUNDER/></FOUNDERS><SIGNERS><SIGNER/></SIGNERS>
+             <REGISTRATION/>…"""
+    member = _biggest_xml(zip_path)
+    proc = _xml_stream(zip_path, member)
+    try:
+        n = 0
+        for elem in _iter_subjects(proc):
+            name = (elem.findtext("NAME") or "").strip()
+            if not name:
+                continue
+            edrpou = (elem.findtext("EDRPOU") or "").strip()
+            stan = (elem.findtext("STAN") or "").strip()
+            opf = (elem.findtext("OPF") or "").strip()
+            reg = (elem.findtext("REGISTRATION") or "").strip()
+            reg_date = reg.split(";")[0].strip() if reg else ""
+
+            # 1) сама юрособа
+            yield ("ЮО", name, edrpou, stan, reg_date, "", "", opf)
+
+            # 2) повʼязані особи — дедуплікуємо ролі в межах одного запису
+            #    (та сама людина часто і засновник, і керівник/представник)
+            roles: dict = {}
+            for f in elem.findall("FOUNDERS/FOUNDER"):
+                p = _founder_person(f.text or "")
+                if p:
+                    roles.setdefault(p, set()).add("засновник")
+            for s in elem.findall("SIGNERS/SIGNER"):
+                p, r = _signer_person_role(s.text or "")
+                if p:
+                    roles.setdefault(p, set()).add(r or "підписант")
+            for person, rset in roles.items():
+                role = ", ".join(sorted(rset))
+                yield ("ЮО", person, edrpou, stan, reg_date, role, name, "")
+            n += 1
+            if n % 500000 == 0:
+                print(f"[edr] ЮО прочитано: {n:,}")
+    finally:
+        proc.stdout.close()
+        proc.wait()
+
+
 # Реєстр частин набору: назва → (ресурс у наборі, генератор рядків)
 _PARTS = {
     "fop": ("FOP.zip", _fop_rows),
-    # "uo": ("UO.zip", _uo_rows),  # додамо після розвідки UO.xml
+    "uo": ("UO.zip", _uo_rows),
 }
 
 
