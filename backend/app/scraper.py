@@ -48,10 +48,18 @@ async def search_by_name(full_name: str, max_pages: int = 3) -> SearchResult:
 
         try:
             print(f"[scraper] Opening {REGISTRY_URL} ...")
-            await page.goto(REGISTRY_URL, wait_until="domcontentloaded", timeout=30_000)
+            # Фаза 1: дістатись сайту й форми пошуку. Якщо тут падаємо —
+            # це недоступність реєстру, а не «нічого не знайдено».
+            try:
+                await page.goto(REGISTRY_URL, wait_until="domcontentloaded", timeout=30_000)
+                await page.wait_for_selector(SEARCH_INPUT_SELECTOR, timeout=15_000)
+            except Exception:
+                raise RuntimeError(
+                    "Єдиний реєстр судових рішень (reyestr.court.gov.ua) зараз "
+                    "не відповідає. Спробуйте пізніше."
+                )
 
             # Fill search field and click submit button
-            await page.wait_for_selector(SEARCH_INPUT_SELECTOR, timeout=15_000)
             await page.fill(SEARCH_INPUT_SELECTOR, full_name)
             await page.click(SUBMIT_BUTTON_SELECTOR)
             # Чекаємо АБО рядки результатів, АБО повідомлення "не знайдено" —

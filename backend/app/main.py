@@ -261,7 +261,12 @@ async def search(
     if len(name.strip()) < 3:
         raise HTTPException(status_code=400, detail="ПІБ занадто коротке")
 
-    result: SearchResult = await search_by_name(name.strip(), max_pages=pages)
+    try:
+        result: SearchResult = await search_by_name(name.strip(), max_pages=pages)
+    except RuntimeError as e:
+        # Реєстр недоступний — окремий статус, щоб клієнт не показував
+        # оманливе «нічого не знайдено».
+        raise HTTPException(status_code=503, detail=str(e))
 
     return {
         "query": result.query,

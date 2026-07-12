@@ -91,11 +91,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
-            ),
           Expanded(child: _buildResults()),
         ],
       ),
@@ -103,13 +98,19 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildResults() {
+    if (_error != null) {
+      return ErrorStateView(message: _error!, onRetry: _search);
+    }
     if (!_searched) {
       return const EmptyStateView(
         icon: Icons.search,
         message: 'Введіть ПІБ для пошуку в Єдиному реєстрі судових рішень',
       );
     }
-    if (!_loading && _results.isEmpty && _error == null) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_results.isEmpty) {
       return const EmptyStateView(icon: Icons.search_off, message: 'Нічого не знайдено');
     }
     return ListView.builder(
