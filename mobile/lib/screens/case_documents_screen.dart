@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/court_case.dart';
 import '../services/api_service.dart';
 import '../widgets/state_views.dart';
+import 'document_viewer_screen.dart';
 
 class CaseDocumentsScreen extends StatefulWidget {
   final CourtCase courtCase;
@@ -100,13 +100,16 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
 
   Future<void> _openDocument(CaseDocument d) async {
     try {
-      final uri = await _api.documentFileUrl(d.docId);
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не вдалося відкрити документ')),
-        );
-      }
+      final viewUri = await _api.documentFileUrl(d.docId);
+      final downloadUri = await _api.documentFileUrl(d.docId, download: true);
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => DocumentViewerScreen(
+          title: d.description,
+          viewUrl: viewUri.toString(),
+          downloadUrl: downloadUri.toString(),
+        ),
+      ));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

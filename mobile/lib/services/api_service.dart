@@ -76,9 +76,12 @@ class ApiService {
 
   /// URL файлу документа (HTML рішення / PDF). Бекенд проксіює його з
   /// авторизацією, тож цей URL можна відкрити прямо в браузері.
-  Future<Uri> documentFileUrl(String docId) async {
+  /// [download] додає ?download=1 — сервер віддасть файл із заголовком
+  /// Content-Disposition: attachment (для збереження).
+  Future<Uri> documentFileUrl(String docId, {bool download = false}) async {
     final base = await getBaseUrl();
-    return Uri.parse('$base/cabinet/documents/$docId/file');
+    final suffix = download ? '?download=1' : '';
+    return Uri.parse('$base/cabinet/documents/$docId/file$suffix');
   }
 
   Future<List<CalendarEvent>> getCalendarEvents() async {

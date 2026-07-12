@@ -177,11 +177,14 @@ async def cabinet_calendar():
 
 
 @app.get("/cabinet/documents/{doc_id}/file")
-async def cabinet_document_file(doc_id: str):
+async def cabinet_document_file(doc_id: str, download: int = 0):
     """
     Проксіює файл документа з cabinet.court.gov.ua (рішення/ухвала —
     HTML або PDF). Авторизація (Bearer/cookies) додається на сервері,
     тож клієнт може відкрити цей URL напряму без облікових даних.
+
+    download=1 → віддаємо із Content-Disposition: attachment, щоб браузер
+    зберіг файл, а не показував його інлайн.
     """
     kep_file = os.getenv("KEP_FILE_PATH", "")
     password = os.getenv("KEP_PASSWORD", "")
@@ -194,7 +197,12 @@ async def cabinet_document_file(doc_id: str):
         if "html" in content_type.lower():
             body, content_type = _prepare_html_document(body)
 
-        return Response(content=body, media_type=content_type)
+        headers = {}
+        if download:
+            ext = "pdf" if "pdf" in content_type.lower() else "html"
+            headers["Content-Disposition"] = f'attachment; filename="document-{doc_id}.{ext}"'
+
+        return Response(content=body, media_type=content_type, headers=headers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
