@@ -83,8 +83,8 @@ def main():
                 f.write(chunk)
         print(f"[status] Завантажено {os.path.getsize(tmp_zip) / 1024 / 1024:.0f} МБ за {time.time()-t0:.0f}с")
 
-        count = status_db.build(_iter_zip_rows(tmp_zip))
-        print(f"[status] Готово: {count:,} унікальних справ за {time.time()-t0:.0f}с")
+        count = status_db.merge(_iter_zip_rows(tmp_zip))
+        print(f"[status] Готово: у базі {count:,} унікальних справ (накопичувально) за {time.time()-t0:.0f}с")
         print(f"[status] База: {status_db.DB_PATH}")
     finally:
         if os.path.exists(tmp_zip):
