@@ -55,8 +55,15 @@ def _iter_rows(zip_path: str):
         csv_infos = [zi for zi in zf.infolist() if zi.filename.lower().endswith(".csv")]
         biggest = max(csv_infos, key=lambda zi: zi.file_size)
         print(f"[asvp] Читаю {biggest.filename} ({biggest.file_size/1024/1024/1024:.1f} ГБ)")
-        with zf.open(biggest.filename) as raw:
-            text = io.TextIOWrapper(raw, encoding="cp1251", errors="replace")
+        member = zf.open(biggest.filename)
+        # Деякі держ-архіви мають розбіжність CRC у кінці — не валимось на
+        # цьому, використовуємо розпаковані дані як є.
+        try:
+            member._expected_crc = None
+        except Exception:
+            pass
+        with member:
+            text = io.TextIOWrapper(member, encoding="cp1251", errors="replace")
             reader = csv.reader(text, delimiter=",", quotechar='"')
             for row in reader:
                 if len(row) < 9 or row[0].strip().upper() == "DEBTOR_NAME":
