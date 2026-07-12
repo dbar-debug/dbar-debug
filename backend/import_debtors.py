@@ -27,9 +27,9 @@ import zipfile
 
 from app import debtors_db
 
-# id набору АСВП на data.gov.ua (заповнити після розвідки — тоді працює
-# автооновлення без явного URL).
-ASVP_DATASET_ID = os.getenv("ASVP_DATASET_ID", "")
+# id набору АСВП на data.gov.ua — package_show віддасть актуальне
+# посилання для автооновлення (пряме посилання nais щодня нове).
+ASVP_DATASET_ID = os.getenv("ASVP_DATASET_ID", "22aef563-3e87-4ed9-92e8-d764dc02f426")
 UA = "Mozilla/5.0 (court-app; +personal use)"
 
 
