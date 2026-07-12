@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/person_case.dart';
 import '../services/api_service.dart';
+import 'document_viewer_screen.dart';
 
 /// Деталі справи: сторони/суть, найближче засідання, поточна стадія,
 /// список засідань і рішення ЄДРСР (з посиланням на текст).
@@ -140,24 +140,22 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
           ),
           title: Text('${d.judgmentForm.isEmpty ? 'Документ' : d.judgmentForm} · ${d.dateHuman}'),
           subtitle: Text([d.justiceKind, if (d.category.isNotEmpty) d.category].join(' · ')),
-          trailing: d.fileUrl.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.download_outlined),
-                  tooltip: 'Зберегти (.rtf)',
-                  onPressed: () => _open(d.fileUrl),
-                )
-              : null,
-          onTap: d.reviewUrl.isEmpty ? null : () => _open(d.reviewUrl),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+          onTap: () => _openDecision(d),
         ),
       );
 
-  Future<void> _open(String url) async {
-    final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не вдалося відкрити посилання')),
-      );
-    }
+  Future<void> _openDecision(Decision d) async {
+    final view = await _api.decisionFileUrl(d.docId);
+    final download = await _api.decisionFileUrl(d.docId, download: true);
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => DocumentViewerScreen(
+        title: '${d.judgmentForm.isEmpty ? 'Рішення' : d.judgmentForm} · ${d.dateHuman}',
+        viewUrl: view.toString(),
+        downloadUrl: download.toString(),
+      ),
+    ));
   }
 
   Widget _iconRow(IconData icon, String text, ColorScheme scheme) => Padding(

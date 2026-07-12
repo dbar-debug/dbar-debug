@@ -143,6 +143,14 @@ class ApiService {
         .toList();
   }
 
+  /// URL проксі тексту рішення (бекенд конвертує .rtf у HTML).
+  /// [download] додає ?download=1 — віддає оригінальний .rtf.
+  Future<Uri> decisionFileUrl(String docId, {bool download = false}) async {
+    final base = await getBaseUrl();
+    final suffix = download ? '?download=1' : '';
+    return Uri.parse('$base/decisions/$docId/file$suffix');
+  }
+
   /// Рішення ЄДРСР за номером справи — /decisions/by-case.
   Future<List<Decision>> getDecisionsByCase(String caseNumber) async {
     final base = await getBaseUrl();

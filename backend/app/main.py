@@ -1,4 +1,6 @@
+import asyncio
 import os
+import urllib.request
 
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -283,6 +285,40 @@ async def decisions_by_case(
         return {"total_found": 0, "decisions": []}
     decisions = await asyncio.to_thread(decisions_db.query_by_case, number.strip())
     return {"total_found": len(decisions), "decisions": decisions}
+
+
+def _fetch_bytes(url: str) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (court-app)"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return r.read()
+
+
+@app.get("/decisions/{doc_id}/file")
+async def decision_file(doc_id: str, download: int = 0):
+    """
+    Проксіює текст рішення ЄДРСР: качає .rtf і віддає як читабельний HTML
+    зі свого домену (щоб відкривалось усередині додатку, без блокування
+    iframe). download=1 — віддає оригінальний .rtf для збереження.
+    """
+    if not decisions_db.available():
+        raise HTTPException(status_code=404, detail="Індекс рішень недоступний")
+    rec = await asyncio.to_thread(decisions_db.get_by_doc_id, doc_id)
+    if not rec or not rec.get("doc_url"):
+        raise HTTPException(status_code=404, detail="Текст рішення недоступний")
+
+    try:
+        body = await asyncio.to_thread(_fetch_bytes, rec["doc_url"])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Не вдалося завантажити рішення: {e}")
+
+    if download:
+        headers = {"Content-Disposition": f'attachment; filename="decision-{doc_id}.rtf"'}
+        return Response(content=body, media_type="application/rtf", headers=headers)
+
+    from app.rtf import rtf_to_html
+    title = f'{rec.get("judgment_form", "Рішення")} у справі {rec.get("cause_num", "")}'.strip()
+    html = await asyncio.to_thread(rtf_to_html, body, title)
+    return Response(content=html.encode("utf-8"), media_type="text/html; charset=utf-8")
 
 
 @app.get("/cabinet/calendar")

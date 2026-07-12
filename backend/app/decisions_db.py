@@ -92,6 +92,23 @@ def build(rows: Iterable[tuple]) -> int:
     return total
 
 
+def get_by_doc_id(doc_id: str) -> dict | None:
+    """Один запис рішення за doc_id (для проксі тексту)."""
+    did = (doc_id or "").strip()
+    if not did:
+        return None
+    conn = _connect(DB_PATH)
+    try:
+        r = conn.execute(
+            "SELECT doc_id, cause_num, court_name, judgment_form, adjudication_date,"
+            "       judge, doc_url FROM decisions WHERE doc_id = ? LIMIT 1",
+            (did,),
+        ).fetchone()
+        return dict(r) if r else None
+    finally:
+        conn.close()
+
+
 def query_by_case(cause_num: str) -> List[dict]:
     """Рішення за номером справи. Найновіші зверху; додаємо посилання на текст."""
     num = (cause_num or "").strip()
