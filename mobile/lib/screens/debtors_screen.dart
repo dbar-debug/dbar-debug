@@ -137,16 +137,11 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
                 Expanded(
                   child: Text(d.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
+                // статус (АСВП) або мітка джерела
                 if (d.vpState.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(d.vpState,
-                        style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
+                  _badge(d.vpState, statusColor)
+                else if (d.source.isNotEmpty)
+                  _badge(d.source, scheme.primary),
               ],
             ),
             const SizedBox(height: 2),
@@ -157,8 +152,12 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
                 Text('код ${d.code}', style: Theme.of(context).textTheme.bodySmall),
             ]),
             const Divider(height: 18),
+            if (d.category.isNotEmpty)
+              _row(Icons.gavel, d.category, scheme.error),
             if (d.creditorName.isNotEmpty)
               _row(Icons.request_quote, 'Стягувач: ${d.creditorName}', scheme.error),
+            if (d.executor.isNotEmpty)
+              _row(Icons.person, 'Виконавець: ${d.executor}', scheme.onSurfaceVariant),
             if (d.orgName.isNotEmpty)
               _row(Icons.account_balance, d.orgName, scheme.onSurfaceVariant),
             if (d.vpNum.isNotEmpty)
@@ -173,6 +172,16 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
       ),
     );
   }
+
+  Widget _badge(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(text,
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+      );
 
   Widget _row(IconData icon, String text, Color color) => Padding(
         padding: const EdgeInsets.only(top: 4),

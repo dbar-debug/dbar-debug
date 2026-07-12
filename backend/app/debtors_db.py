@@ -1,17 +1,12 @@
 """
-Локальний SQLite-індекс «Автоматизованої системи виконавчого
-провадження» (АСВП, відкриті дані nais.gov.ua) для пошуку за ПІБ (FTS5)
-або кодом. Замінює вужчий «Єдиний реєстр боржників»: тут є стягувач,
-статус провадження і дата відкриття.
+Локальний SQLite-індекс боргів/виконавчих проваджень за ПІБ (FTS5) або
+кодом. Обʼєднує ДВА відкриті набори (союз рядків, кожен з позначкою source):
 
-Джерело — повний знімок (~3 ГБ CSV, cp1251, кома-розділ), тож будуємо
-базу з нуля й атомарно підмінюємо. Кожен рядок = одне виконавче
-провадження проти боржника.
+  • ЄРБ  — Єдиний реєстр боржників (ширший, приватні борги; поле «категорія»);
+  • АСВП — Автоматизована система виконавчого провадження (стягувач,
+           статус, дата відкриття; переважно держпровадження).
 
-Колонки джерела (28-ex_csv_asvp.csv):
-  DEBTOR_NAME, DEBTOR_BIRTHDATE, DEBTOR_CODE, CREDITOR_NAME, CREDITOR_CODE,
-  VP_ORDERNUM, VP_BEGINDATE, VP_STATE, ORG_NAME, DVS_CODE, PHONE_NUM,
-  EMAIL_ADDR, BANK_ACCOUNT
+Обидва — повні знімки, тож базу будуємо з нуля й атомарно підмінюємо.
 """
 
 import os
@@ -21,9 +16,9 @@ from typing import Iterable, List
 _DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "debtors.db")
 DB_PATH = os.getenv("DEBTORS_DB_PATH", _DEFAULT_DB)
 
-# Порядок кортежу від імпортера
-IN_COLS = ["debtor_name", "birthdate", "code", "creditor_name",
-           "vp_num", "vp_begindate", "vp_state", "org_name"]
+# Уніфікований порядок полів (обидва джерела мапляться на нього)
+IN_COLS = ["source", "debtor_name", "birthdate", "code", "creditor_name",
+           "category", "vp_num", "vp_begindate", "vp_state", "org_name", "executor"]
 OUT_COLS = IN_COLS
 
 
@@ -52,35 +47,31 @@ def build(rows: Iterable[tuple]) -> int:
             PRAGMA temp_store = FILE;
             PRAGMA cache_size = -200000;
             CREATE TABLE debtors (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY, source TEXT,
                 debtor_name TEXT, birthdate TEXT, code TEXT, creditor_name TEXT,
-                vp_num TEXT, vp_begindate TEXT, vp_state TEXT, org_name TEXT
+                category TEXT, vp_num TEXT, vp_begindate TEXT, vp_state TEXT,
+                org_name TEXT, executor TEXT
             );
             """
         )
         cur = conn.cursor()
+        cols = ",".join(c for c in IN_COLS)
+        ph = ",".join("?" for _ in IN_COLS)
+        sql = f"INSERT INTO debtors ({cols}) VALUES ({ph})"
         batch: List[tuple] = []
         total = 0
         for r in rows:
             batch.append(r)
             if len(batch) >= 50000:
-                cur.executemany(
-                    "INSERT INTO debtors"
-                    " (debtor_name,birthdate,code,creditor_name,vp_num,vp_begindate,vp_state,org_name)"
-                    " VALUES (?,?,?,?,?,?,?,?)", batch
-                )
+                cur.executemany(sql, batch)
                 total += len(batch)
                 batch.clear()
                 if total % 1_000_000 == 0:
-                    print(f"[asvp] вставлено: {total:,}")
+                    print(f"[debtors] вставлено: {total:,}")
         if batch:
-            cur.executemany(
-                "INSERT INTO debtors"
-                " (debtor_name,birthdate,code,creditor_name,vp_num,vp_begindate,vp_state,org_name)"
-                " VALUES (?,?,?,?,?,?,?,?)", batch
-            )
+            cur.executemany(sql, batch)
             total += len(batch)
-        print(f"[asvp] Усього записів: {total:,}. Будую індекси...")
+        print(f"[debtors] Усього записів: {total:,}. Будую індекси...")
         conn.executescript(
             """
             CREATE INDEX idx_code ON debtors(code);
@@ -100,7 +91,7 @@ def build(rows: Iterable[tuple]) -> int:
     return total
 
 
-def query_by_name(name_norm: str, limit: int = 100) -> List[dict]:
+def query_by_name(name_norm: str, limit: int = 200) -> List[dict]:
     tokens = [t for t in name_norm.split() if len(t) > 1]
     if not tokens:
         return []
@@ -118,7 +109,7 @@ def query_by_name(name_norm: str, limit: int = 100) -> List[dict]:
         conn.close()
 
 
-def query_by_code(code: str, limit: int = 100) -> List[dict]:
+def query_by_code(code: str, limit: int = 200) -> List[dict]:
     c = (code or "").strip()
     if not c:
         return []
