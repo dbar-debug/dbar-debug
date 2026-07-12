@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/cabinet_screen.dart';
+import 'screens/debtors_screen.dart';
 import 'screens/hearings_screen.dart';
 import 'screens/person_search_screen.dart';
 import 'screens/settings_screen.dart';
@@ -46,6 +47,7 @@ class _HomeTabsState extends State<HomeTabs> {
     CabinetScreen(),
     HearingsScreen(),
     PersonSearchScreen(),
+    DebtorsScreen(),
     SettingsScreen(),
   ];
 
@@ -60,6 +62,7 @@ class _HomeTabsState extends State<HomeTabs> {
           NavigationDestination(icon: Icon(Icons.folder_outlined), label: 'Справи'),
           NavigationDestination(icon: Icon(Icons.event_outlined), label: 'Засідання'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Пошук'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: 'Борги'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Налаштування'),
         ],
       ),

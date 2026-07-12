@@ -1,0 +1,12 @@
+# systemd-таймер: щоденне оновлення індексу боржників (о 03:00).
+
+[Unit]
+Description=Щоденне оновлення індексу Єдиного реєстру боржників
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

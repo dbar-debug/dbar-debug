@@ -1,0 +1,23 @@
+# systemd-сервіс: оновлює локальний індекс Єдиного реєстру боржників.
+# Важкий (~4 ГБ CSV), запускається таймером раз на добу вночі.
+#
+# Встановлення:
+#   sudo cp debtors-import.service /etc/systemd/system/
+#   sudo cp debtors-import.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now debtors-import.timer
+#   sudo systemctl start debtors-import.service   # перший імпорт одразу
+#   journalctl -u debtors-import -f
+
+[Unit]
+Description=Оновлення індексу Єдиного реєстру боржників (відкриті дані)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dbar
+WorkingDirectory=/home/dbar/court-app/backend
+Environment=PATH=/home/dbar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 import_debtors.py
+TimeoutStartSec=7200

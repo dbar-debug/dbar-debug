@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/court_case.dart';
+import '../models/debtor.dart';
 import '../models/person_case.dart';
 
 const _defaultBaseUrl = 'https://court-app.duckdns.org';
@@ -163,6 +164,20 @@ class ApiService {
     return (body['decisions'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>()
         .map(Decision.fromJson)
+        .toList();
+  }
+
+  /// Пошук у Єдиному реєстрі боржників за ПІБ або кодом — /debtors/search.
+  Future<List<Debtor>> searchDebtors(String q) async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/debtors/search').replace(queryParameters: {'q': q});
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final body = _decodeOrThrow(response);
+
+    return (body['debtors'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Debtor.fromJson)
         .toList();
   }
 

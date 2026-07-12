@@ -12,6 +12,7 @@ from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_f
 from app.hearings import get_hearings_for_cases, get_hearings_for_name
 from app.status import get_status_for_name
 from app import decisions_db
+from app import debtors_db
 from app.models import SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
@@ -268,6 +269,29 @@ async def person_cases(
 
     result = sorted(cases.values(), key=_sort_key)
     return {"total_found": len(result), "cases": result}
+
+
+@app.get("/debtors/search")
+async def debtors_search(
+    q: str = Query(..., description="ПІБ або код (ІПН/ЄДРПОУ)", example="Барцуков Денис"),
+):
+    """
+    Пошук у Єдиному реєстрі боржників за ПІБ або кодом (ІПН/ЄДРПОУ).
+    Якщо запит складається лише з цифр — шукаємо за кодом, інакше за ПІБ.
+    """
+    query = q.strip()
+    if len(query) < 4:
+        raise HTTPException(status_code=400, detail="Введіть ПІБ (мін. 4 символи) або код")
+    if not debtors_db.available():
+        return {"total_found": 0, "debtors": []}
+
+    digits = query.replace(" ", "")
+    if digits.isdigit():
+        rows = await asyncio.to_thread(debtors_db.query_by_code, digits)
+    else:
+        name_norm = " ".join(query.lower().split())
+        rows = await asyncio.to_thread(debtors_db.query_by_name, name_norm)
+    return {"total_found": len(rows), "debtors": rows}
 
 
 @app.get("/decisions/by-case")
