@@ -12,6 +12,50 @@ class CaseParticipant {
   }
 }
 
+/// Судове засідання з відкритих даних "Список справ призначених до розгляду".
+class Hearing {
+  final DateTime date; // день засідання
+  final String time; // "10:30" або "" якщо невідомо
+  final String caseNumber;
+  final String courtName;
+  final String judges;
+  final String involved; // сторони
+  final String description;
+  final String room;
+
+  Hearing({
+    required this.date,
+    required this.time,
+    required this.caseNumber,
+    required this.courtName,
+    required this.judges,
+    required this.involved,
+    required this.description,
+    required this.room,
+  });
+
+  factory Hearing.fromJson(Map<String, dynamic> json) {
+    final raw = json['date'] as String? ?? '';
+    final parsed = DateTime.tryParse(raw) ?? DateTime(1970);
+    // час беремо або з окремого поля, або з datetime, якщо він там є
+    var time = json['time'] as String? ?? '';
+    if (time.isEmpty && (parsed.hour != 0 || parsed.minute != 0)) {
+      time = '${parsed.hour.toString().padLeft(2, '0')}:'
+          '${parsed.minute.toString().padLeft(2, '0')}';
+    }
+    return Hearing(
+      date: DateTime(parsed.year, parsed.month, parsed.day),
+      time: time,
+      caseNumber: json['case_number'] as String? ?? json['case'] as String? ?? '—',
+      courtName: json['court_name'] as String? ?? '—',
+      judges: json['judges'] as String? ?? '—',
+      involved: json['case_involved'] as String? ?? json['involved'] as String? ?? '',
+      description: json['case_description'] as String? ?? json['description'] as String? ?? '',
+      room: json['court_room'] as String? ?? json['room'] as String? ?? '',
+    );
+  }
+}
+
 class CaseDocument {
   final String number;
   final String date;

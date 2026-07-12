@@ -95,6 +95,20 @@ class ApiService {
     return events;
   }
 
+  Future<List<Hearing>> getHearings() async {
+    final base = await getBaseUrl();
+    final uri = Uri.parse('$base/cabinet/hearings');
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 120));
+    final body = _decodeOrThrow(response);
+
+    final hearings = (body['hearings'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Hearing.fromJson)
+        .toList();
+    return hearings;
+  }
+
   Map<String, dynamic> _decodeOrThrow(http.Response response) {
     Map<String, dynamic> body;
     try {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/cabinet_screen.dart';
-import 'screens/calendar_screen.dart';
+import 'screens/hearings_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -44,7 +44,7 @@ class _HomeTabsState extends State<HomeTabs> {
 
   static const _screens = [
     CabinetScreen(),
-    CalendarScreen(),
+    HearingsScreen(),
     SearchScreen(),
     SettingsScreen(),
   ];
@@ -58,7 +58,7 @@ class _HomeTabsState extends State<HomeTabs> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.folder_outlined), label: 'Справи'),
-          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), label: 'Календар'),
+          NavigationDestination(icon: Icon(Icons.event_outlined), label: 'Засідання'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Пошук'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Налаштування'),
         ],

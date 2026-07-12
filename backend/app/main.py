@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.scraper import search_by_name
 from app.cabinet_auth import get_session, clear_session
 from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events
+from app.hearings import get_hearings_for_cases
 from app.models import SearchResult
 
 CABINET_URL = "https://cabinet.court.gov.ua"
@@ -116,6 +117,27 @@ async def cabinet_case_documents(case_id: str):
                 for d in docs
             ],
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/cabinet/hearings")
+async def cabinet_hearings():
+    """
+    Майбутні судові засідання по справах користувача — з відкритих даних
+    'Список справ призначених до розгляду' (data.gov.ua), зіставлені за
+    номерами справ з кабінету.
+    """
+    kep_file = os.getenv("KEP_FILE_PATH", "")
+    password = os.getenv("KEP_PASSWORD", "")
+    if not kep_file or not password:
+        raise HTTPException(status_code=400, detail="Встановіть KEP_FILE_PATH та KEP_PASSWORD у .env")
+    try:
+        session = await get_session(kep_file, password)
+        result = await get_my_cases(session)
+        numbers = [c.case_number for c in result.cases if c.case_number and c.case_number != "—"]
+        hearings = await get_hearings_for_cases(numbers)
+        return {"total_found": len(hearings), "hearings": hearings}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
