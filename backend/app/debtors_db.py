@@ -1,14 +1,17 @@
 """
-Локальний SQLite-індекс «Єдиного реєстру боржників» (відкриті дані) для
-пошуку за ПІБ (FTS5) або за кодом (ІПН/ЄДРПОУ).
+Локальний SQLite-індекс «Автоматизованої системи виконавчого
+провадження» (АСВП, відкриті дані nais.gov.ua) для пошуку за ПІБ (FTS5)
+або кодом. Замінює вужчий «Єдиний реєстр боржників»: тут є стягувач,
+статус провадження і дата відкриття.
 
-Джерело — повний знімок (~4 ГБ CSV, cp1251), тож будуємо базу з нуля й
-атомарно підмінюємо. Кожен рядок = одне виконавче провадження проти
-боржника (у людини їх може бути кілька).
+Джерело — повний знімок (~3 ГБ CSV, cp1251, кома-розділ), тож будуємо
+базу з нуля й атомарно підмінюємо. Кожен рядок = одне виконавче
+провадження проти боржника.
 
-Колонки джерела (кома-розділені, у лапках, cp1251):
-  DEBTOR_NAME, DEBTOR_BIRTHDATE, DEBTOR_CODE, PUBLISHER, ORG_NAME,
-  ORG_PHONE_NUM, EMP_FULL_FIO, EMP_PHONE_NUM, EMAIL_ADDR, VP_ORDERNUM, VD_CAT
+Колонки джерела (28-ex_csv_asvp.csv):
+  DEBTOR_NAME, DEBTOR_BIRTHDATE, DEBTOR_CODE, CREDITOR_NAME, CREDITOR_CODE,
+  VP_ORDERNUM, VP_BEGINDATE, VP_STATE, ORG_NAME, DVS_CODE, PHONE_NUM,
+  EMAIL_ADDR, BANK_ACCOUNT
 """
 
 import os
@@ -19,8 +22,8 @@ _DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "
 DB_PATH = os.getenv("DEBTORS_DB_PATH", _DEFAULT_DB)
 
 # Порядок кортежу від імпортера
-IN_COLS = ["debtor_name", "birthdate", "code", "publisher", "org_name",
-           "executor", "vp_num", "category"]
+IN_COLS = ["debtor_name", "birthdate", "code", "creditor_name",
+           "vp_num", "vp_begindate", "vp_state", "org_name"]
 OUT_COLS = IN_COLS
 
 
@@ -50,8 +53,8 @@ def build(rows: Iterable[tuple]) -> int:
             PRAGMA cache_size = -200000;
             CREATE TABLE debtors (
                 id INTEGER PRIMARY KEY,
-                debtor_name TEXT, birthdate TEXT, code TEXT, publisher TEXT,
-                org_name TEXT, executor TEXT, vp_num TEXT, category TEXT
+                debtor_name TEXT, birthdate TEXT, code TEXT, creditor_name TEXT,
+                vp_num TEXT, vp_begindate TEXT, vp_state TEXT, org_name TEXT
             );
             """
         )
@@ -63,21 +66,21 @@ def build(rows: Iterable[tuple]) -> int:
             if len(batch) >= 50000:
                 cur.executemany(
                     "INSERT INTO debtors"
-                    " (debtor_name,birthdate,code,publisher,org_name,executor,vp_num,category)"
+                    " (debtor_name,birthdate,code,creditor_name,vp_num,vp_begindate,vp_state,org_name)"
                     " VALUES (?,?,?,?,?,?,?,?)", batch
                 )
                 total += len(batch)
                 batch.clear()
                 if total % 1_000_000 == 0:
-                    print(f"[debtors] вставлено: {total:,}")
+                    print(f"[asvp] вставлено: {total:,}")
         if batch:
             cur.executemany(
                 "INSERT INTO debtors"
-                " (debtor_name,birthdate,code,publisher,org_name,executor,vp_num,category)"
+                " (debtor_name,birthdate,code,creditor_name,vp_num,vp_begindate,vp_state,org_name)"
                 " VALUES (?,?,?,?,?,?,?,?)", batch
             )
             total += len(batch)
-        print(f"[debtors] Усього записів: {total:,}. Будую індекси...")
+        print(f"[asvp] Усього записів: {total:,}. Будую індекси...")
         conn.executescript(
             """
             CREATE INDEX idx_code ON debtors(code);

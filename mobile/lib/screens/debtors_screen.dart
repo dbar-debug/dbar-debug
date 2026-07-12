@@ -123,6 +123,7 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
 
   Widget _debtorCard(Debtor d) {
     final scheme = Theme.of(context).colorScheme;
+    final statusColor = d.isClosed ? Colors.green : scheme.error;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Padding(
@@ -130,7 +131,24 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(d.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(d.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                if (d.vpState.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(d.vpState,
+                        style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+              ],
+            ),
             const SizedBox(height: 2),
             Wrap(spacing: 12, children: [
               if (d.birthdate.isNotEmpty)
@@ -139,14 +157,17 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
                 Text('код ${d.code}', style: Theme.of(context).textTheme.bodySmall),
             ]),
             const Divider(height: 18),
-            if (d.category.isNotEmpty)
-              _row(Icons.gavel, d.category, scheme.error),
+            if (d.creditorName.isNotEmpty)
+              _row(Icons.request_quote, 'Стягувач: ${d.creditorName}', scheme.error),
             if (d.orgName.isNotEmpty)
               _row(Icons.account_balance, d.orgName, scheme.onSurfaceVariant),
-            if (d.executor.isNotEmpty)
-              _row(Icons.person, 'Виконавець: ${d.executor}', scheme.onSurfaceVariant),
             if (d.vpNum.isNotEmpty)
-              _row(Icons.tag, 'ВП № ${d.vpNum}', scheme.onSurfaceVariant),
+              _row(
+                Icons.tag,
+                'ВП № ${d.vpNum}'
+                '${d.vpBeginDate.isNotEmpty ? ' · з ${d.vpBeginDate}' : ''}',
+                scheme.onSurfaceVariant,
+              ),
           ],
         ),
       ),
