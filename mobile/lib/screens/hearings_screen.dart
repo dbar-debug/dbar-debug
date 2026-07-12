@@ -83,20 +83,33 @@ class _HearingsScreenState extends State<HearingsScreen> {
     final future = _hearings.where((h) => !h.date.isBefore(today)).toList();
     final past = _hearings.where((h) => h.date.isBefore(today)).toList();
 
-    final children = <Widget>[];
+    final sections = <Widget>[];
 
     if (future.isNotEmpty) {
+      final futChildren = <Widget>[];
       // Майбутні — за зростанням дати (найближче зверху)
-      _appendGrouped(children, future, ascending: true);
+      _appendGrouped(futChildren, future, ascending: true);
+      sections.add(_expansionSection(
+        title: 'Майбутні засідання',
+        count: future.length,
+        children: futChildren,
+        initiallyExpanded: true,
+      ));
     }
 
     if (past.isNotEmpty) {
-      children.add(_sectionHeader('МИНУЛІ'));
+      final pastChildren = <Widget>[];
       // Минулі — за спаданням дати (найновіше зверху)
-      _appendGrouped(children, past, ascending: false);
+      _appendGrouped(pastChildren, past, ascending: false);
+      sections.add(_expansionSection(
+        title: 'Минулі засідання',
+        count: past.length,
+        children: pastChildren,
+        initiallyExpanded: false,
+      ));
     }
 
-    return ListView(padding: const EdgeInsets.only(bottom: 24), children: children);
+    return ListView(padding: const EdgeInsets.only(bottom: 24), children: sections);
   }
 
   /// Групує засідання по днях і додає заголовок дня + картки у [out].
@@ -120,16 +133,48 @@ class _HearingsScreenState extends State<HearingsScreen> {
     }
   }
 
-  Widget _sectionHeader(String text) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 1,
+  /// Згортна секція («Майбутні» / «Минулі») із заголовком, лічильником
+  /// і стрілкою. Всередині — згруповані по днях засідання.
+  Widget _expansionSection({
+    required String title,
+    required int count,
+    required List<Widget> children,
+    required bool initiallyExpanded,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Theme(
+      // Прибираємо стандартні лінії ExpansionTile, щоб було чистіше
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        title: Row(
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: scheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$count',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.onSecondaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+          ],
+        ),
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        children: children,
       ),
     );
   }
