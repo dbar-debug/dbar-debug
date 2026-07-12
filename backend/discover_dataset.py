@@ -16,6 +16,7 @@ import sys
 import urllib.parse
 import urllib.request
 import zipfile
+import zlib
 
 UA = "Mozilla/5.0 (court-app; discovery)"
 SAMPLE_SIZE_LIMIT = 800 * 1024 * 1024  # не качати авто-зразок, якщо файл > 800 МБ
