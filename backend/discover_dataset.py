@@ -60,42 +60,21 @@ def _print_resources(pkg):
     return resources
 
 
-def _sample_resource(url: str):
-    """Показати заголовок і перші рядки CSV (розпакувавши zip за потреби)."""
-    size = _content_length(url)
-    print(f"\n{'='*70}\nЗразок: {url}")
-    print(f"Розмір (Content-Length): {_human(size)}")
-    if size and size > SAMPLE_SIZE_LIMIT:
-        print(f"⚠ Файл завеликий для авто-зразка (>{_human(SAMPLE_SIZE_LIMIT)}). "
-              "Скажи — зробимо потокову вибірку.")
-        return
+def _decode(raw: bytes):
+    """Декодує байти, визначаючи utf-8 vs cp1251 за кількістю замін."""
+    u = raw.decode("utf-8", "replace")
+    if u.count("�") > max(10, len(u) * 0.01):
+        return raw.decode("cp1251", "replace"), "cp1251"
+    return u, "utf-8"
 
-    if url.lower().endswith(".zip"):
-        print("Тип: ZIP — розпаковую найбільший CSV усередині...")
-        raw = _get(url)
-        zf = zipfile.ZipFile(io.BytesIO(raw))
-        infos = zf.infolist()
-        print("Файли в архіві (розмір розпакований):")
-        for zi in infos:
-            print(f"  {zi.filename}  —  {_human(zi.file_size)}")
-        csv_infos = [zi for zi in infos if zi.filename.lower().endswith(".csv")]
-        if not csv_infos:
-            print("У архіві немає CSV.")
-            return
-        # Найбільший CSV = головний файл даних (довідники малі)
-        biggest = max(csv_infos, key=lambda zi: zi.file_size)
-        print(f"\nБеру найбільший: {biggest.filename} ({_human(biggest.file_size)})")
-        with zf.open(biggest.filename) as f:
-            chunk = f.read(262144)
-    else:
-        req = urllib.request.Request(url, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            chunk = resp.read(262144)
 
-    text = chunk.decode("utf-8", errors="replace")
-    first_line = text.split("\n", 1)[0]
-    delim = "\t" if first_line.count("\t") >= first_line.count(",") else ","
-    print(f"Роздільник: {'TAB' if delim == chr(9) else 'кома'}\n")
+def _print_csv_sample(raw: bytes):
+    text, enc = _decode(raw)
+    first = text.split("\n", 1)[0]
+    counts = {"\t": first.count("\t"), ";": first.count(";"), ",": first.count(",")}
+    delim = max(counts, key=counts.get) if max(counts.values()) > 0 else ","
+    names = {"\t": "TAB", ";": "крапка з комою", ",": "кома"}
+    print(f"Кодування: {enc} | Роздільник: {names[delim]}\n")
 
     reader = csv.reader(io.StringIO(text), delimiter=delim, quotechar='"')
     for idx, row in enumerate(reader):
@@ -108,6 +87,84 @@ def _sample_resource(url: str):
             print(f"  рядок {idx}: {row}")
         if idx >= 3:
             break
+
+
+def _stream_sample_zip(url: str) -> bool:
+    """Потокова вибірка ПЕРШОГО файлу в zip без завантаження всього архіву."""
+    import struct
+
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        head = resp.read(65536)
+        if head[:4] != b"PK\x03\x04":
+            return False  # не локальний заголовок zip
+        method = struct.unpack("<H", head[8:10])[0]
+        fnlen = struct.unpack("<H", head[26:28])[0]
+        exlen = struct.unpack("<H", head[28:30])[0]
+        name = head[30:30 + fnlen].decode("utf-8", "replace")
+        data = head[30 + fnlen + exlen:]
+        print(f"Перший файл в архіві: {name} | метод стиснення: {method}")
+
+        target = 300000
+        if method == 0:  # без стиснення
+            out = data
+            while len(out) < target:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                out += chunk
+            raw = out[:target]
+        elif method == 8:  # deflate
+            d = zlib.decompressobj(-15)
+            out = d.decompress(data)
+            while len(out) < target:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                out += d.decompress(chunk)
+            raw = out[:target]
+        else:
+            print(f"Невідомий метод стиснення {method} — потрібне повне завантаження")
+            return False
+
+    _print_csv_sample(raw)
+    return True
+
+
+def _sample_resource(url: str):
+    """Показати заголовок і перші рядки CSV (розпакувавши zip за потреби)."""
+    size = _content_length(url)
+    print(f"\n{'='*70}\nЗразок: {url}")
+    print(f"Розмір (Content-Length): {_human(size)}")
+
+    if url.lower().endswith(".zip"):
+        # Великі архіви семплимо потоково (перший файл), малі — повністю
+        if size and size > SAMPLE_SIZE_LIMIT:
+            print("Тип: ZIP (великий) — потокова вибірка першого файлу...")
+            if _stream_sample_zip(url):
+                return
+            print("Потокова вибірка не вдалась — потрібне повне завантаження.")
+            return
+        print("Тип: ZIP — розпаковую найбільший CSV усередині...")
+        raw = _get(url)
+        zf = zipfile.ZipFile(io.BytesIO(raw))
+        infos = zf.infolist()
+        print("Файли в архіві (розмір розпакований):")
+        for zi in infos:
+            print(f"  {zi.filename}  —  {_human(zi.file_size)}")
+        csv_infos = [zi for zi in infos if zi.filename.lower().endswith(".csv")]
+        if not csv_infos:
+            print("У архіві немає CSV.")
+            return
+        biggest = max(csv_infos, key=lambda zi: zi.file_size)
+        print(f"\nБеру найбільший: {biggest.filename} ({_human(biggest.file_size)})")
+        with zf.open(biggest.filename) as f:
+            _print_csv_sample(f.read(262144))
+        return
+
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        _print_csv_sample(resp.read(262144))
 
 
 def _newest_resource(resources):
