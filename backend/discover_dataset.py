@@ -1,67 +1,93 @@
 """
-Розвідник відкритих наборів data.gov.ua: знаходить набір за запитом,
-показує його ресурси й перші рядки CSV (заголовок + приклади) — щоб
-дізнатись реальну схему колонок перед написанням імпортера.
+Розвідник відкритих наборів data.gov.ua: знаходить набір за запитом або
+за id, показує його ресурси (з розмірами) і перші рядки CSV — навіть
+якщо CSV запакований у .zip. Мета — дізнатись реальну схему колонок і
+обсяг даних перед написанням імпортера.
 
 Використання (на сервері, backend/):
-    python3 discover_dataset.py "стан розгляду справ"
+    python3 discover_dataset.py "стан розгляду справ"     # пошук
+    python3 discover_dataset.py --id 0ad60ea9-b029-456d-abc0-8c77a99b205c
 """
 
 import csv
 import io
+import json
 import sys
 import urllib.parse
 import urllib.request
+import zipfile
 
 UA = "Mozilla/5.0 (court-app; discovery)"
+SAMPLE_SIZE_LIMIT = 800 * 1024 * 1024  # не качати авто-зразок, якщо файл > 800 МБ
 
 
 def _get(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=120) as r:
         return r.read()
 
 
-def main():
-    query = sys.argv[1] if len(sys.argv) > 1 else "стан розгляду справ"
-    print(f"Пошук набору: {query}\n")
+def _content_length(url: str):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA}, method="HEAD")
+        with urllib.request.urlopen(req, timeout=30) as r:
+            cl = r.headers.get("Content-Length")
+            return int(cl) if cl else None
+    except Exception:
+        return None
 
-    api = "https://data.gov.ua/api/3/action/package_search?q=" + urllib.parse.quote(query) + "&rows=10"
-    import json
-    data = json.loads(_get(api).decode("utf-8"))
-    results = data.get("result", {}).get("results", [])
-    print(f"Знайдено наборів: {len(results)}\n")
 
-    for i, r in enumerate(results):
-        print(f"[{i}] {r.get('title')}")
-        print(f"     id={r.get('id')}  name={r.get('name')}")
-        csv_res = [res for res in r.get("resources", []) if (res.get("format") or "").upper() == "CSV"]
-        for res in csv_res[:3]:
-            print(f"     CSV: {res.get('name')}  id={res.get('id')}")
-            print(f"          {res.get('url')}")
-        print()
+def _human(n):
+    if n is None:
+        return "?"
+    for unit in ("Б", "КБ", "МБ", "ГБ"):
+        if n < 1024:
+            return f"{n:.0f} {unit}"
+        n /= 1024
+    return f"{n:.1f} ТБ"
 
-    if not results:
+
+def _print_resources(pkg):
+    print(f"Набір: {pkg.get('title')}  id={pkg.get('id')}")
+    resources = pkg.get("resources", [])
+    print(f"Ресурсів: {len(resources)}\n")
+    for res in resources:
+        fmt = (res.get("format") or "").upper()
+        print(f"  • {res.get('name')}")
+        print(f"    format={fmt}  size={_human(res.get('size'))}  "
+              f"created={res.get('created')}  last_modified={res.get('last_modified')}")
+        print(f"    {res.get('url')}")
+    return resources
+
+
+def _sample_resource(url: str):
+    """Показати заголовок і перші рядки CSV (розпакувавши zip за потреби)."""
+    size = _content_length(url)
+    print(f"\n{'='*70}\nЗразок: {url}")
+    print(f"Розмір (Content-Length): {_human(size)}")
+    if size and size > SAMPLE_SIZE_LIMIT:
+        print(f"⚠ Файл завеликий для авто-зразка (>{_human(SAMPLE_SIZE_LIMIT)}). "
+              "Скажи — зробимо потокову вибірку.")
         return
 
-    # Беремо найперший CSV найпершого набору і показуємо перші рядки
-    top = results[0]
-    csv_res = [res for res in top.get("resources", []) if (res.get("format") or "").upper() == "CSV"]
-    if not csv_res:
-        print("У першому наборі немає CSV-ресурсу.")
-        return
+    if url.lower().endswith(".zip"):
+        print("Тип: ZIP — розпаковую перший CSV усередині...")
+        raw = _get(url)
+        zf = zipfile.ZipFile(io.BytesIO(raw))
+        names = zf.namelist()
+        print(f"Файли в архіві: {names}")
+        csv_name = next((n for n in names if n.lower().endswith(".csv")), names[0] if names else None)
+        if not csv_name:
+            print("У архіві немає CSV.")
+            return
+        with zf.open(csv_name) as f:
+            chunk = f.read(262144)
+    else:
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            chunk = resp.read(262144)
 
-    url = csv_res[-1]["url"]
-    print("=" * 70)
-    print(f"Зразок даних із: {url}\n")
-
-    # Качаємо лише початок (перші ~256 КБ), щоб не тягнути весь файл
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        chunk = resp.read(262144)
     text = chunk.decode("utf-8", errors="replace")
-
-    # Пробуємо визначити роздільник за першим рядком
     first_line = text.split("\n", 1)[0]
     delim = "\t" if first_line.count("\t") >= first_line.count(",") else ","
     print(f"Роздільник: {'TAB' if delim == chr(9) else 'кома'}\n")
@@ -77,6 +103,42 @@ def main():
             print(f"  рядок {idx}: {row}")
         if idx >= 3:
             break
+
+
+def _newest_resource(resources):
+    """Найсвіжіший ресурс: спершу датований снепшот (vid-...), інакше останній."""
+    dated = [r for r in resources if "vid-" in (r.get("name") or "").lower()]
+    pool = dated or resources
+    def keyf(r):
+        return r.get("last_modified") or r.get("created") or ""
+    return max(pool, key=keyf) if pool else None
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print("Вкажи запит або --id <dataset_id>")
+        return
+
+    if args[0] == "--id":
+        dataset_id = args[1]
+        api = f"https://data.gov.ua/api/3/action/package_show?id={dataset_id}"
+        pkg = json.loads(_get(api).decode("utf-8"))["result"]
+        resources = _print_resources(pkg)
+        newest = _newest_resource(resources)
+        if newest:
+            print(f"\nНайсвіжіший ресурс: {newest.get('name')}")
+            _sample_resource(newest["url"])
+        return
+
+    query = args[0]
+    print(f"Пошук набору: {query}\n")
+    api = "https://data.gov.ua/api/3/action/package_search?q=" + urllib.parse.quote(query) + "&rows=10"
+    data = json.loads(_get(api).decode("utf-8"))
+    results = data.get("result", {}).get("results", [])
+    print(f"Знайдено наборів: {len(results)}\n")
+    for i, r in enumerate(results):
+        print(f"[{i}] {r.get('title')}  id={r.get('id')}")
 
 
 if __name__ == "__main__":
