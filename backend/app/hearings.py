@@ -26,7 +26,9 @@ import json
 import re
 import time
 import urllib.request
-from typing import List, Set
+from typing import Iterator, List, Set
+
+from app import hearings_db
 
 DATASET_ID = "42eaff6e-45da-4426-b4a1-f30989bfd36f"
 # Прямий лінк (fallback, якщо package_show недоступний)
@@ -49,6 +51,10 @@ async def get_hearings_for_cases(case_numbers: List[str]) -> List[dict]:
     if not numbers:
         return []
 
+    # Є локальний індекс → швидкий запит з SQLite
+    if hearings_db.available():
+        return await asyncio.to_thread(hearings_db.query_by_cases, numbers)
+
     key = ",".join(sorted(numbers))
     cached = _cache.get(key)
     if cached and (time.time() - cached[0]) < _CACHE_TTL:
@@ -68,6 +74,10 @@ async def get_hearings_for_name(full_name: str) -> List[dict]:
     name_norm = _normalize(full_name)
     if len(name_norm) < 5:
         return []
+
+    # Є локальний індекс → швидкий FTS-запит
+    if hearings_db.available():
+        return await asyncio.to_thread(hearings_db.query_by_name, name_norm)
 
     key = "name:" + name_norm
     cached = _cache.get(key)
@@ -115,27 +125,49 @@ def _stream_and_collect(predicate) -> List[dict]:
                     continue
                 if not predicate(row):
                     continue
-                case = row[2].strip()
-                date_iso, htime = _split_date_time(row[0].strip())
-                dedup = (case, date_iso, htime)
+                h = _row_to_hearing(row)
+                dedup = (h["case_number"], h["date"], h["time"])
                 if dedup in seen:
                     continue
                 seen.add(dedup)
-                hearings.append({
-                    "date": date_iso,
-                    "time": htime,
-                    "case_number": case,
-                    "court_name": row[3].strip(),
-                    "judges": row[1].strip(),
-                    "case_involved": row[5].strip(),
-                    "case_description": row[6].strip(),
-                    "court_room": row[4].strip(),
-                })
+                hearings.append(h)
     except Exception as e:
         print(f"[hearings] Помилка завантаження/парсингу: {e}")
 
     hearings.sort(key=lambda h: (h["date"], h["time"]))
     return hearings
+
+
+def iter_all_hearings() -> Iterator[dict]:
+    """
+    Потоково видає ВСІ засідання з CSV (для імпортера в SQLite).
+    Без дедуплікації — її робить побудова бази.
+    """
+    url = _resolve_csv_url()
+    print(f"[hearings] Імпорт CSV: {url}")
+    req = urllib.request.Request(url, headers={"User-Agent": _UA})
+    with urllib.request.urlopen(req, timeout=600) as resp:
+        text = io.TextIOWrapper(resp, encoding="utf-8", errors="replace")
+        reader = csv.reader(text, delimiter="\t", quotechar='"')
+        for row in reader:
+            if len(row) < 7:
+                continue
+            yield _row_to_hearing(row)
+
+
+def _row_to_hearing(row: List[str]) -> dict:
+    """Рядок CSV → словник засідання (єдина точка мапінгу колонок)."""
+    date_iso, htime = _split_date_time(row[0].strip())
+    return {
+        "date": date_iso,
+        "time": htime,
+        "case_number": row[2].strip(),
+        "court_name": row[3].strip(),
+        "judges": row[1].strip(),
+        "case_involved": row[5].strip(),
+        "case_description": row[6].strip(),
+        "court_room": row[4].strip(),
+    }
 
 
 def _normalize(s: str) -> str:

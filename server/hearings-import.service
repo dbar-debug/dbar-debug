@@ -1,0 +1,25 @@
+# systemd-сервіс: оновлює локальний індекс засідань (SQLite/FTS5)
+# з відкритих даних. Запускається таймером hearings-import.timer раз на добу.
+#
+# Встановлення:
+#   sudo cp hearings-import.service /etc/systemd/system/
+#   sudo cp hearings-import.timer   /etc/systemd/system/
+#   # за потреби відредагуйте User= та шляхи під свого користувача
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hearings-import.timer
+#   # перший імпорт одразу (не чекаючи таймера):
+#   sudo systemctl start hearings-import.service
+#   journalctl -u hearings-import -f
+
+[Unit]
+Description=Оновлення індексу судових засідань (відкриті дані)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dbar
+WorkingDirectory=/home/dbar/court-app/backend
+# ~/.local/bin у PATH (там залежності після pip install --user)
+Environment=PATH=/home/dbar/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 import_hearings.py

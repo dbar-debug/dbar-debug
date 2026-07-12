@@ -1,0 +1,15 @@
+# systemd-таймер: запускає hearings-import.service раз на добу
+# (дані оновлюються щодня). Плюс — наздоганяє пропущений запуск, якщо
+# машина була вимкнена (Persistent=true).
+
+[Unit]
+Description=Щоденне оновлення індексу судових засідань
+
+[Timer]
+# Щодня о 06:30 (дані зазвичай оновлені зранку). Змініть за потреби.
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
