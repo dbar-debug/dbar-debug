@@ -21,7 +21,8 @@ _DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "
 DB_PATH = os.getenv("EDR_DB_PATH", _DEFAULT_DB)
 
 # Уніфікований порядок полів (обидва типи мапляться на нього)
-IN_COLS = ["kind", "name", "code", "stan", "reg_date", "role", "org_name", "extra"]
+IN_COLS = ["kind", "name", "code", "stan", "reg_date", "role", "org_name",
+           "extra", "termination"]
 OUT_COLS = IN_COLS
 
 
@@ -52,7 +53,7 @@ def build(rows: Iterable[tuple]) -> int:
             CREATE TABLE edr (
                 id INTEGER PRIMARY KEY, kind TEXT,
                 name TEXT, code TEXT, stan TEXT, reg_date TEXT,
-                role TEXT, org_name TEXT, extra TEXT
+                role TEXT, org_name TEXT, extra TEXT, termination TEXT
             );
             """
         )

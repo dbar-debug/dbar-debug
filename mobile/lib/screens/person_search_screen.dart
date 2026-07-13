@@ -211,6 +211,23 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
               const SizedBox(height: 4),
               Text(r.extra, style: Theme.of(context).textTheme.bodySmall),
             ],
+            if (r.termination.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.cancel_outlined, size: 14, color: scheme.error),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text('Припинено: ${r.termination}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: scheme.error)),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

@@ -152,6 +152,26 @@ def _iter_subjects(proc):
             root.clear()  # прибираємо оброблені записи з кореня — памʼять стабільна
 
 
+def _termination(elem) -> str:
+    """Дата й причина припинення. Спершу TERMINATED_INFO
+    («дата; номер; причина»), інакше структуроване «в стані припинення»
+    (TERMINATION_STARTED_INFO → OP_DATE/REASON)."""
+    ti = next((t.text.strip() for t in elem.findall("TERMINATED_INFO")
+               if (t.text or "").strip()), "")
+    if ti:
+        parts = [p.strip() for p in ti.split(";")]
+        date = parts[0] if parts else ""
+        reason = parts[-1] if len(parts) >= 3 else ""
+        return f"{date} — {reason}" if reason else date
+    st = elem.find("TERMINATION_STARTED_INFO")
+    if st is not None and len(st):
+        date = (st.findtext("OP_DATE") or "").strip()
+        reason = (st.findtext("REASON") or "").strip()
+        res = f"{date} — {reason}".strip(" —")
+        return res
+    return ""
+
+
 def _fop_rows(zip_path: str):
     """ФОП: <SUBJECT><NAME/><STAN/><REGISTRATION/><ESTATE_MANAGER/><FARMER/>…"""
     member = _biggest_xml(zip_path)
@@ -172,7 +192,8 @@ def _fop_rows(zip_path: str):
                 extra.append(f"Управитель майна: {manager}")
             if farmer:
                 extra.append("Сімейне фермерське господарство")
-            yield ("ФОП", name, "", stan, reg_date, "", "", "; ".join(extra))
+            yield ("ФОП", name, "", stan, reg_date, "", "",
+                   "; ".join(extra), _termination(elem))
             n += 1
             if n % 500000 == 0:
                 print(f"[edr] ФОП прочитано: {n:,}")
@@ -216,9 +237,10 @@ def _uo_rows(zip_path: str):
             opf = (elem.findtext("OPF") or "").strip()
             reg = (elem.findtext("REGISTRATION") or "").strip()
             reg_date = reg.split(";")[0].strip() if reg else ""
+            term = _termination(elem)
 
             # 1) сама юрособа
-            yield ("ЮО", name, edrpou, stan, reg_date, "", "", opf)
+            yield ("ЮО", name, edrpou, stan, reg_date, "", "", opf, term)
 
             # 2) повʼязані особи — дедуплікуємо ролі в межах одного запису
             #    (та сама людина часто і засновник, і керівник/представник)
@@ -233,7 +255,7 @@ def _uo_rows(zip_path: str):
                     roles.setdefault(p, set()).add(r or "підписант")
             for person, rset in roles.items():
                 role = ", ".join(sorted(rset))
-                yield ("ЮО", person, edrpou, stan, reg_date, role, name, "")
+                yield ("ЮО", person, edrpou, stan, reg_date, role, name, "", term)
             n += 1
             if n % 500000 == 0:
                 print(f"[edr] ЮО прочитано: {n:,}")
