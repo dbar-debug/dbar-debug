@@ -23,6 +23,26 @@
   CPU / пам'ять / диск, список інтерфейсів зі швидкістю ↑/↓ у реальному часі
 - **Акаунт**: темний режим (Авто / Світла / Темна)
 
+## Фаза 2 — керування роутером (готово)
+
+- **Бокове меню** на дашборді: Налаштування роутера, Журнали, Port Knocking,
+  Вимкнення, Перезавантаження (з підтвердженням)
+- **Налаштування роутера** — універсальний браузер конфігурації
+  (`lib/config/menu_tree.dart` + генеричні екрани): CAPsMAN, Interfaces,
+  Wireless, Bridge, PPP, Switch, Mesh, IP (Addresses, ARP, DHCP, DNS,
+  **Firewall: Filter/NAT/Mangle/Raw/Service Ports/Connections/Address
+  Lists**, Pool, Routes, Services), IPv6, Routing, System, Queues, Radius,
+  Files
+- **Список елементів** у стилі карток Winbox: пошук, бейдж
+  enabled/disabled, коментарі `;;;`, pull-to-refresh
+- **Пакетні дії**: довге натискання → вибір кількох → увімкнути /
+  вимкнути / видалити / вибрати все
+- **Редактор елемента** з секціями Comment/Disable | General | Advanced |
+  Action (для firewall — повний набір полів як у Winbox); для інших таблиць
+  — генеричний редактор за атрибутами
+- **Журнали роутера** з пошуком і підсвіткою error/warning
+- **Port Knocking**: послідовність TCP/UDP-стуків із налаштованою паузою
+
 ## Запуск
 
 ```bash
@@ -38,14 +58,15 @@ flutter run
 
 ## Дорожня карта (наступні фази)
 
-- [ ] **Клієнти**: DHCP leases, wireless registration, hotspot, PPP active
+- [x] **Конфігурація**: interfaces, wireless, bridge, IP (addresses, firewall,
+      DHCP), queues, system — фаза 2
+- [x] **Логи** роутера з пошуком — фаза 2
+- [x] **Port Knocking** перед підключенням — фаза 2
+- [ ] **Клієнти**: зведений екран DHCP leases, wireless registration,
+      hotspot, PPP active (окремі таблиці вже доступні в налаштуваннях)
 - [ ] **Інтерфейси**: окремий екран з графіками rx/tx
-- [ ] **Конфігурація**: interfaces, wireless, bridge, IP (addresses, firewall,
-      DHCP), queues, system
-- [ ] **Логи** роутера з пошуком
 - [ ] **Інструменти**: Ping, Traceroute, Bandwidth Test
 - [ ] **Файли**: backup / restore
-- [ ] **Port Knocking** перед підключенням
 - [ ] **Команда**: спільний список роутерів через "командний сервер"
       (роутер MikroTik як сховище файлу зі списком)
 - [ ] **PushStats**: пасивний моніторинг + push-сповіщення (потрібен бекенд

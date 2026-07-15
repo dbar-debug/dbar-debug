@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../models/router_device.dart';
 import '../services/routeros_client.dart';
+import 'logs_screen.dart';
+import 'port_knock_screen.dart';
+import 'router_settings_screen.dart';
 
 /// Дашборд підключеного роутера: ідентичність, версія RouterOS,
 /// CPU / пам'ять / диск, аптайм та трафік інтерфейсів у реальному часі.
@@ -126,6 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _poll),
         ],
       ),
+      endDrawer: _buildDrawer(context),
       body: RefreshIndicator(
         onRefresh: _poll,
         child: ListView(
@@ -171,6 +175,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            ListTile(
+              title: Text(_identity ?? widget.device.name,
+                  style: Theme.of(context).textTheme.titleMedium),
+              subtitle: Text(widget.device.host),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Налаштування роутера'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) =>
+                      RouterSettingsScreen(client: widget.client),
+                ));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.article_outlined),
+              title: const Text('Журнали роутера'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => LogsScreen(client: widget.client),
+                ));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Port Knocking'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) =>
+                      PortKnockScreen(host: widget.device.host),
+                ));
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.power_settings_new),
+              title: const Text('Вимкнення'),
+              onTap: () => _confirmPower(context, shutdown: true),
+            ),
+            ListTile(
+              leading: const Icon(Icons.restart_alt),
+              title: const Text('Перезавантаження'),
+              onTap: () => _confirmPower(context, shutdown: false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmPower(BuildContext context,
+      {required bool shutdown}) async {
+    Navigator.pop(context); // закрити drawer
+    final action = shutdown ? 'вимкнути' : 'перезавантажити';
+    final confirmed = await showDialog<bool>(
+      context: this.context,
+      builder: (context) => AlertDialog(
+        title: Text(shutdown ? 'Вимкнення' : 'Перезавантаження'),
+        content: Text(
+            'Точно $action роутер ${_identity ?? widget.device.host}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Скасувати')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(shutdown ? 'Вимкнути' : 'Перезавантажити')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.client
+          .talk([shutdown ? '/system/shutdown' : '/system/reboot']);
+    } on Object {
+      // з'єднання розривається одразу після команди — це очікувано
+    }
+    if (mounted) {
+      Navigator.of(this.context).pop(); // вийти з дашборда
+    }
   }
 
   Widget _gauge(String label, double value, String text) {
