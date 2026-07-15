@@ -1,0 +1,20 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# Платформні папки генеруються через `flutter create .`
+ios/
+android/
+macos/
+linux/
+windows/
+web/
+
+# IDE
+.idea/
+*.iml
+.vscode/
