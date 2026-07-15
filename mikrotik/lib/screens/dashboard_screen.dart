@@ -1,12 +1,30 @@
 import 'package:flutter/material.dart';
 
 import '../services/metrics_collector.dart';
+import '../services/routeros_client.dart';
+import '../widgets/donut_chart.dart';
+import 'interfaces_tab.dart';
 
-/// Вкладка Dashboard сесії роутера: модель, версія, аптайм,
-/// CPU / пам'ять / диск і швидкості інтерфейсів у реальному часі.
+/// Вкладка Dashboard сесії роутера: ресурси, сукупний трафік,
+/// статус Ethernet-портів і діаграма типів інтерфейсів.
 class DashboardTab extends StatelessWidget {
   final MetricsCollector collector;
-  const DashboardTab({super.key, required this.collector});
+  final RouterOSClient client;
+
+  const DashboardTab(
+      {super.key, required this.collector, required this.client});
+
+  static const _typeColors = [
+    Colors.blue,
+    Colors.lightGreen,
+    Colors.yellow,
+    Colors.orange,
+    Colors.lightBlue,
+    Colors.redAccent,
+    Colors.purple,
+    Colors.teal,
+    Colors.brown,
+  ];
 
   double _percentUsed(String? freeStr, String? totalStr) {
     final free = int.tryParse(freeStr ?? '');
@@ -26,6 +44,19 @@ class DashboardTab extends StatelessWidget {
             _percentUsed(resource['free-memory'], resource['total-memory']);
         final diskUsed = _percentUsed(
             resource['free-hdd-space'], resource['total-hdd-space']);
+
+        // Кількість інтерфейсів за типами для кільцевої діаграми.
+        final typeCounts = <String, int>{};
+        for (final f in collector.interfaces) {
+          final type = f['type'] ?? 'інше';
+          typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+        }
+        var colorIndex = 0;
+        final segments = [
+          for (final entry in typeCounts.entries)
+            DonutSegment(entry.key, entry.value.toDouble(),
+                _typeColors[colorIndex++ % _typeColors.length]),
+        ];
 
         return RefreshIndicator(
           onRefresh: collector.refresh,
@@ -53,6 +84,18 @@ class DashboardTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text('Аптайм: ${resource['uptime'] ?? '…'}'),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text('Трафік:  '),
+                          Text('↑ ${formatBps(collector.aggregateTxBps)}',
+                              style: const TextStyle(color: Colors.blue)),
+                          const SizedBox(width: 12),
+                          Text('↓ ${formatBps(collector.aggregateRxBps)}',
+                              style:
+                                  const TextStyle(color: Colors.deepOrange)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -63,11 +106,32 @@ class DashboardTab extends StatelessWidget {
                   '${(memUsed * 100).toStringAsFixed(0)}%'),
               _gauge(context, 'Диск', diskUsed,
                   '${(diskUsed * 100).toStringAsFixed(0)}%'),
-              const SizedBox(height: 16),
-              Text('Інтерфейси',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              for (final f in collector.interfaces) _interfaceTile(f),
+              if (collector.ethernetStatus.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Ethernet',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Card(
+                  child: Column(
+                    children: [
+                      for (final e in collector.ethernetStatus)
+                        _ethernetTile(context, e),
+                    ],
+                  ),
+                ),
+              ],
+              if (segments.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Типи інтерфейсів',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: DonutChart(segments: segments),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -98,31 +162,37 @@ class DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _interfaceTile(Map<String, String> f) {
-    final name = f['name'] ?? '?';
-    final running = f['running'] == 'true';
-    final disabled = f['disabled'] == 'true';
-    final rate = collector.rates[name];
+  Widget _ethernetTile(BuildContext context, Map<String, String> e) {
+    final name = e['name'] ?? '?';
+    final linkOk = e['status'] == 'link-ok';
     return ListTile(
       dense: true,
-      leading: Icon(
-        Icons.circle,
-        size: 12,
-        color: disabled
-            ? Colors.grey
-            : running
-                ? Colors.green
-                : Colors.red,
+      leading: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          color: linkOk ? Colors.green.shade400 : Colors.grey.shade400,
+          borderRadius: BorderRadius.circular(4),
+        ),
       ),
       title: Text(name),
-      subtitle: Text(f['type'] ?? ''),
-      trailing: rate == null
-          ? null
-          : Text(
-              '↑ ${formatBps(rate.txBps)}\n↓ ${formatBps(rate.rxBps)}',
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 12),
-            ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (linkOk && (e['rate'] ?? '').isNotEmpty)
+            Text(e['rate']!,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w500)),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => InterfaceDetailScreen(
+          collector: collector,
+          client: client,
+          name: name,
+        ),
+      )),
     );
   }
 }

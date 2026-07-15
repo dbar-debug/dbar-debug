@@ -58,6 +58,28 @@ class _InterfacesTabState extends State<InterfacesTab> {
                 onRefresh: widget.collector.refresh,
                 child: ListView(
                   children: [
+                    if (q.isEmpty) ...[
+                      Container(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        child: Text('aggregate',
+                            style: Theme.of(context).textTheme.titleSmall),
+                      ),
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.functions, size: 18),
+                        title: const Text('aggregate'),
+                        trailing: Text(
+                          '↑ ${formatBps(widget.collector.aggregateTxBps)}\n'
+                          '↓ ${formatBps(widget.collector.aggregateRxBps)}',
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
                     for (final entry in groups.entries) ...[
                       Container(
                         color: Theme.of(context)

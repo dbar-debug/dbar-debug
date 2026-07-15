@@ -68,7 +68,7 @@ class _ConnectedShellState extends State<ConnectedShell> {
           body: IndexedStack(
             index: _index,
             children: [
-              DashboardTab(collector: _collector),
+              DashboardTab(collector: _collector, client: widget.client),
               ClientsTab(client: widget.client),
               InterfacesTab(collector: _collector, client: widget.client),
               ChartsTab(collector: _collector, storageKey: widget.device.host),

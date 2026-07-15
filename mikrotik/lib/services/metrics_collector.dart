@@ -41,6 +41,14 @@ class MetricsCollector extends ChangeNotifier {
   double memTotalMb = 0;
   final Map<String, List<double>> rxHistory = {}; // Mbps за інтерфейсом
   final Map<String, List<double>> txHistory = {};
+
+  /// Статус Ethernet-портів: name, status (link-ok/no-link), rate (1Gbps…).
+  List<Map<String, String>> ethernetStatus = [];
+
+  /// Сукупний трафік роутера (monitor-traffic aggregate), біт/с.
+  double aggregateRxBps = 0;
+  double aggregateTxBps = 0;
+
   String? error;
 
   void start() {
@@ -101,6 +109,41 @@ class MetricsCollector extends ChangeNotifier {
       final freeMem = double.tryParse(resource['free-memory'] ?? '') ?? 0;
       memTotalMb = totalMem / (1024 * 1024);
       _push(memUsedHistory, (totalMem - freeMem) / (1024 * 1024));
+
+      // Статус Ethernet-портів (лінк + узгоджена швидкість).
+      try {
+        final ethers = ifaces
+            .where((f) => f['type'] == 'ether')
+            .map((f) => f['name'])
+            .whereType<String>()
+            .toList();
+        if (ethers.isNotEmpty) {
+          ethernetStatus = await client.talk([
+            '/interface/ethernet/monitor',
+            '=numbers=${ethers.join(',')}',
+            '=once=',
+          ]);
+        }
+      } on Object {
+        ethernetStatus = [];
+      }
+
+      // Сукупний трафік (як "aggregate" у Winbox).
+      try {
+        final agg = await client.talk([
+          '/interface/monitor-traffic',
+          '=interface=aggregate',
+          '=once=',
+        ]);
+        if (agg.isNotEmpty) {
+          aggregateRxBps =
+              double.tryParse(agg.first['rx-bits-per-second'] ?? '') ?? 0;
+          aggregateTxBps =
+              double.tryParse(agg.first['tx-bits-per-second'] ?? '') ?? 0;
+        }
+      } on Object {
+        // старі версії RouterOS без aggregate — не критично
+      }
 
       error = null;
     } on Object catch (e) {

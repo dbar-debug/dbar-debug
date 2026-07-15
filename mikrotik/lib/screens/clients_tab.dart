@@ -5,12 +5,29 @@ import '../services/routeros_client.dart';
 class _ClientSource {
   final String label;
   final String path;
-  final List<String> fields; // поля картки
-  const _ClientSource(this.label, this.path, this.fields);
+  final String titleKey;
+  final String? fallbackTitleKey;
+  final String subtitleKey;
+  final String trailingTopKey;
+  final String trailingBottomKey;
+  final String? signalKey; // рівень сигналу (wireless)
+  final String removeLabel;
+
+  const _ClientSource(
+    this.label,
+    this.path, {
+    required this.titleKey,
+    this.fallbackTitleKey,
+    required this.subtitleKey,
+    required this.trailingTopKey,
+    required this.trailingBottomKey,
+    this.signalKey,
+    required this.removeLabel,
+  });
 }
 
-/// Вкладка Clients: ключові клієнти роутера — DHCP leases,
-/// wireless registration, PPP active, hotspot active.
+/// Вкладка Clients: DHCP | Wireless | Hotspot | PPP — як у WinboxMobile.
+/// Тап відкриває деталі клієнта з можливістю видалити/роз'єднати.
 class ClientsTab extends StatefulWidget {
   final RouterOSClient client;
   const ClientsTab({super.key, required this.client});
@@ -22,13 +39,31 @@ class ClientsTab extends StatefulWidget {
 class _ClientsTabState extends State<ClientsTab> {
   static const _sources = [
     _ClientSource('DHCP', '/ip/dhcp-server/lease',
-        ['address', 'mac-address', 'host-name', 'status', 'last-seen']),
+        titleKey: 'address',
+        subtitleKey: 'mac-address',
+        trailingTopKey: 'server',
+        trailingBottomKey: 'host-name',
+        removeLabel: 'Видалити оренду'),
     _ClientSource('Wireless', '/interface/wireless/registration-table',
-        ['interface', 'mac-address', 'signal-strength', 'uptime']),
-    _ClientSource('PPP', '/ppp/active',
-        ['name', 'address', 'service', 'uptime']),
+        titleKey: 'last-ip',
+        fallbackTitleKey: 'mac-address',
+        subtitleKey: 'mac-address',
+        trailingTopKey: 'interface',
+        trailingBottomKey: 'uptime',
+        signalKey: 'signal-strength',
+        removeLabel: 'Роз\'єднати'),
     _ClientSource('Hotspot', '/ip/hotspot/active',
-        ['user', 'address', 'mac-address', 'uptime']),
+        titleKey: 'user',
+        subtitleKey: 'address',
+        trailingTopKey: 'server',
+        trailingBottomKey: 'uptime',
+        removeLabel: 'Завершити сеанс'),
+    _ClientSource('PPP', '/ppp/active',
+        titleKey: 'name',
+        subtitleKey: 'address',
+        trailingTopKey: 'service',
+        trailingBottomKey: 'uptime',
+        removeLabel: 'Роз\'єднати'),
   ];
 
   int _sourceIndex = 0;
@@ -66,6 +101,117 @@ class _ClientsTabState extends State<ClientsTab> {
     }
   }
 
+  /// Витягує dBm з рядка виду "-65@HT20" або "-65".
+  int? _signalDbm(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final match = RegExp(r'-?\d+').firstMatch(raw);
+    return match == null ? null : int.tryParse(match.group(0)!);
+  }
+
+  Widget _signalIcon(int dbm) {
+    final Color color;
+    final IconData icon;
+    if (dbm >= -60) {
+      color = Colors.green;
+      icon = Icons.signal_cellular_alt;
+    } else if (dbm >= -75) {
+      color = Colors.orange;
+      icon = Icons.signal_cellular_alt_2_bar;
+    } else {
+      color = Colors.red;
+      icon = Icons.signal_cellular_alt_1_bar;
+    }
+    return Icon(icon, color: color, size: 22);
+  }
+
+  Future<void> _showDetail(
+      _ClientSource source, Map<String, String> item) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            Text('${source.label}: '
+                '${item[source.titleKey] ?? item[source.fallbackTitleKey ?? ''] ?? ''}',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final entry in item.entries)
+              if (!entry.key.startsWith('.') && entry.value.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 140,
+                        child: Text(entry.key,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            )),
+                      ),
+                      Expanded(
+                        child: Text(entry.value,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500)),
+                      ),
+                    ],
+                  ),
+                ),
+            const SizedBox(height: 16),
+            if (item['.id'] != null)
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                onPressed: () => _remove(source, item),
+                child: Text(source.removeLabel),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _remove(_ClientSource source, Map<String, String> item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(source.removeLabel),
+        content: Text('${item[source.titleKey] ?? ''} '
+            '(${item[source.subtitleKey] ?? ''})'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Скасувати')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Так')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.client
+          .talk(['${source.path}/remove', '=.id=${item['.id']}']);
+      if (mounted) Navigator.pop(context); // закрити деталі
+    } on Object catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Помилка: $e')));
+      }
+    }
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final source = _sources[_sourceIndex];
@@ -73,8 +219,8 @@ class _ClientsTabState extends State<ClientsTab> {
     final items = q.isEmpty
         ? _items
         : _items
-            .where((i) =>
-                i.values.any((v) => v.toLowerCase().contains(q)))
+            .where(
+                (i) => i.values.any((v) => v.toLowerCase().contains(q)))
             .toList();
 
     return Column(
@@ -134,10 +280,12 @@ class _ClientsTabState extends State<ClientsTab> {
                               SizedBox(height: 120),
                               Center(child: Text('Порожньо')),
                             ])
-                          : ListView.builder(
+                          : ListView.separated(
                               itemCount: items.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
                               itemBuilder: (context, i) =>
-                                  _card(source, items[i]),
+                                  _tile(source, items[i]),
                             ),
                     ),
         ),
@@ -145,36 +293,37 @@ class _ClientsTabState extends State<ClientsTab> {
     );
   }
 
-  Widget _card(_ClientSource source, Map<String, String> item) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            for (final key in source.fields)
-              if ((item[key] ?? '').isNotEmpty)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(key,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                        )),
-                    Flexible(
-                      child: Text(item[key]!,
-                          textAlign: TextAlign.end,
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w500)),
-                    ),
-                  ],
-                ),
-          ],
-        ),
+  Widget _tile(_ClientSource source, Map<String, String> item) {
+    final title = item[source.titleKey] ??
+        item[source.fallbackTitleKey ?? ''] ??
+        '?';
+    final dbm = source.signalKey == null
+        ? null
+        : _signalDbm(item[source.signalKey!]);
+    return ListTile(
+      leading: dbm == null ? null : _signalIcon(dbm),
+      title: Text(title),
+      subtitle: Text(item[source.subtitleKey] ?? ''),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(item[source.trailingTopKey] ?? '',
+                  style: const TextStyle(fontSize: 13)),
+              Text(item[source.trailingBottomKey] ?? '',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
+            ],
+          ),
+          const Icon(Icons.chevron_right),
+        ],
       ),
+      onTap: () => _showDetail(source, item),
     );
   }
 }
