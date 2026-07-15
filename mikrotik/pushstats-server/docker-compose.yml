@@ -1,0 +1,23 @@
+services:
+  pushstats:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - pushstats-data:/data
+    environment:
+      # Пороги алертів, %
+      ALERT_CPU: "90"
+      ALERT_MEM: "90"
+      ALERT_DISK: "90"
+      # Через скільки хвилин без даних вважати роутер офлайн
+      ALERT_OFFLINE_MINUTES: "15"
+      # Куди слати сповіщення (напр. https://ntfy.sh/ваш-топік).
+      # Порожньо — тільки в лог.
+      ALERT_WEBHOOK_URL: ""
+      # Скільки днів зберігати часові ряди
+      PUSHSTATS_KEEP_DAYS: "14"
+
+volumes:
+  pushstats-data:
