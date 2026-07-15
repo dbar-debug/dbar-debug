@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/router_device.dart';
 import '../services/router_store.dart';
 import '../services/routeros_client.dart';
-import 'dashboard_screen.dart';
+import 'connected_shell.dart';
 import 'scan_screen.dart';
 
 /// Вкладка "Підключення" — швидке підключення за IP, як у WinboxMobile:
@@ -55,7 +55,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       await RouterStore.instance.update(device);
       if (!mounted) return;
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => DashboardScreen(client: client, device: device),
+        builder: (_) => ConnectedShell(client: client, device: device),
       ));
     } on Object catch (e) {
       client.close();

@@ -83,13 +83,22 @@ class RouterOSClient {
 
   /// Надсилає команду та повертає всі !re-відповіді як список мап атрибутів.
   /// Кидає [RouterOSException] при !trap або !fatal.
-  Future<List<Map<String, String>>> talk(List<String> words) {
-    final result = _lock.then((_) => _talkInner(words));
+  ///
+  /// [onReply] викликається для кожної !re-відповіді у міру надходження —
+  /// зручно для стрімінгових команд (/ping, /tool/traceroute тощо).
+  Future<List<Map<String, String>>> talk(
+    List<String> words, {
+    void Function(Map<String, String> reply)? onReply,
+  }) {
+    final result = _lock.then((_) => _talkInner(words, onReply: onReply));
     _lock = result.then<void>((_) {}, onError: (_) {});
     return result;
   }
 
-  Future<List<Map<String, String>>> _talkInner(List<String> words) async {
+  Future<List<Map<String, String>>> _talkInner(
+    List<String> words, {
+    void Function(Map<String, String> reply)? onReply,
+  }) async {
     if (!isConnected) {
       throw RouterOSException('Немає з\'єднання з роутером');
     }
@@ -114,6 +123,7 @@ class RouterOSClient {
       switch (reply) {
         case '!re':
           results.add(attrs);
+          onReply?.call(attrs);
         case '!trap':
           trapMessage = attrs['message'] ?? sentence.skip(1).join(' ');
         case '!fatal':

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/router_device.dart';
 import '../services/router_store.dart';
 import '../services/routeros_client.dart';
-import 'dashboard_screen.dart';
+import 'connected_shell.dart';
 import 'router_form_screen.dart';
 
 /// Вкладка "Збережені" — список збережених роутерів з пошуком,
@@ -45,7 +45,7 @@ class _SavedScreenState extends State<SavedScreen> {
       await client.login(device.username, device.password);
       if (!mounted) return;
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => DashboardScreen(client: client, device: device),
+        builder: (_) => ConnectedShell(client: client, device: device),
       ));
     } on Object catch (e) {
       client.close();
