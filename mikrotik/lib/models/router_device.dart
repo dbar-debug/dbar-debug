@@ -22,6 +22,8 @@ class RouterDevice {
 
   int get effectivePort => port ?? (useSsl ? 8729 : 8728);
 
+  /// Пароль НЕ серіалізується у shared_preferences — він зберігається
+  /// окремо в Keychain через SecureCredentials (див. RouterStore).
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -29,7 +31,6 @@ class RouterDevice {
         'port': port,
         'useSsl': useSsl,
         'username': username,
-        'password': password,
         'labels': labels,
       };
 

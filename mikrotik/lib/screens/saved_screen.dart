@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../models/router_device.dart';
 import '../services/router_store.dart';
 import '../services/routeros_client.dart';
@@ -51,7 +52,7 @@ class _SavedScreenState extends State<SavedScreen> {
       client.close();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не вдалося підключитися: $e')),
+        SnackBar(content: Text('${tr('connect_failed')}: $e')),
       );
     } finally {
       if (mounted) setState(() => _connecting = false);
@@ -68,13 +69,13 @@ class _SavedScreenState extends State<SavedScreen> {
         title: _searching
             ? TextField(
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Пошук: назва, IP, мітка…',
+                decoration: InputDecoration(
+                  hintText: tr('saved_search_hint'),
                   border: InputBorder.none,
                 ),
                 onChanged: (v) => setState(() => _query = v),
               )
-            : const Text('Збережені'),
+            : Text(tr('tab_saved')),
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search),
@@ -88,9 +89,9 @@ class _SavedScreenState extends State<SavedScreen> {
       body: _connecting
           ? const Center(child: CircularProgressIndicator())
           : routers.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
-                    'Немає збережених роутерів.\nДодайте через + або вкладку "Підключення".',
+                    tr('saved_empty'),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -131,11 +132,11 @@ class _SavedScreenState extends State<SavedScreen> {
                                 await _store.remove(r.id);
                               }
                             },
-                            itemBuilder: (_) => const [
+                            itemBuilder: (_) => [
                               PopupMenuItem(
-                                  value: 'edit', child: Text('Редагувати')),
+                                  value: 'edit', child: Text(tr('edit'))),
                               PopupMenuItem(
-                                  value: 'delete', child: Text('Видалити')),
+                                  value: 'delete', child: Text(tr('delete'))),
                             ],
                           ),
                         ],

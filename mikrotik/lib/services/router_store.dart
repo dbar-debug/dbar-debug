@@ -4,11 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/router_device.dart';
+import 'secure_credentials.dart';
 
-/// Сховище збережених роутерів (shared_preferences).
+/// Сховище збережених роутерів.
 ///
-/// TODO: перед публікацією перенести паролі у flutter_secure_storage /
-/// Keychain — зараз вони зберігаються у відкритому вигляді.
+/// Нечутливі поля — у shared_preferences; паролі — у Keychain через
+/// [SecureCredentials]. Старі записи, де пароль лежав у prefs, автоматично
+/// мігруються в Keychain при першому завантаженні.
 class RouterStore extends ChangeNotifier {
   RouterStore._();
   static final RouterStore instance = RouterStore._();
@@ -22,14 +24,29 @@ class RouterStore extends ChangeNotifier {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
+    var needMigration = false;
     if (raw != null && raw.isNotEmpty) {
       final list = jsonDecode(raw) as List<dynamic>;
-      routers
-        ..clear()
-        ..addAll(list.map(
-            (e) => RouterDevice.fromJson(e as Map<String, dynamic>)));
+      routers.clear();
+      for (final e in list) {
+        final map = e as Map<String, dynamic>;
+        final device = RouterDevice.fromJson(map);
+        // Міграція: якщо пароль лежав у prefs — перенести в Keychain.
+        final legacyPw = map['password'] as String?;
+        if (legacyPw != null && legacyPw.isNotEmpty) {
+          await SecureCredentials.instance.setPassword(device.id, legacyPw);
+          device.password = legacyPw;
+          needMigration = true;
+        } else {
+          device.password =
+              await SecureCredentials.instance.getPassword(device.id);
+        }
+        routers.add(device);
+      }
     }
     _loaded = true;
+    // Перезаписати prefs без паролів, якщо була міграція.
+    if (needMigration) await _save();
     notifyListeners();
   }
 
@@ -42,6 +59,7 @@ class RouterStore extends ChangeNotifier {
 
   Future<void> add(RouterDevice device) async {
     routers.add(device);
+    await SecureCredentials.instance.setPassword(device.id, device.password);
     await _save();
   }
 
@@ -52,11 +70,13 @@ class RouterStore extends ChangeNotifier {
     } else {
       routers.add(device);
     }
+    await SecureCredentials.instance.setPassword(device.id, device.password);
     await _save();
   }
 
   Future<void> remove(String id) async {
     routers.removeWhere((r) => r.id == id);
+    await SecureCredentials.instance.deletePassword(id);
     await _save();
   }
 

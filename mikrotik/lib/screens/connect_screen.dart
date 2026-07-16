@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../models/router_device.dart';
 import '../services/router_store.dart';
 import '../services/routeros_client.dart';
@@ -61,7 +62,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       client.close();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не вдалося підключитися: $e')),
+        SnackBar(content: Text('${tr('connect_failed')}: $e')),
       );
     } finally {
       if (mounted) setState(() => _connecting = false);
@@ -80,28 +81,27 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Швидке підключення')),
+      appBar: AppBar(title: Text(tr('quick_connect'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
             controller: _host,
-            decoration:
-                const InputDecoration(labelText: 'IP або доменне ім\'я'),
+            decoration: InputDecoration(labelText: tr('field_host')),
             keyboardType: TextInputType.url,
           ),
           TextField(
             controller: _user,
-            decoration: const InputDecoration(
-              labelText: 'Ім\'я користувача',
+            decoration: InputDecoration(
+              labelText: tr('field_user'),
               hintText: 'admin',
             ),
           ),
           TextField(
             controller: _password,
-            decoration: const InputDecoration(
-              labelText: 'Пароль',
-              hintText: 'Необов\'язковий',
+            decoration: InputDecoration(
+              labelText: tr('field_password'),
+              hintText: tr('field_password_opt'),
             ),
             obscureText: true,
           ),
@@ -113,10 +113,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
           ),
           TextField(
             controller: _port,
-            decoration: const InputDecoration(
-              labelText: 'Порт',
-              hintText: 'Необов\'язковий',
-              helperText: 'Порт за замовчуванням: api — 8728, api-ssl — 8729',
+            decoration: InputDecoration(
+              labelText: tr('field_port'),
+              hintText: tr('field_password_opt'),
+              helperText: tr('port_hint'),
             ),
             keyboardType: TextInputType.number,
           ),
@@ -129,18 +129,16 @@ class _ConnectScreenState extends State<ConnectScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Підключитися зараз'),
+                : Text(tr('connect_now')),
           ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: _openScanner,
-            child: const Text('Сканування локальної мережі'),
+            child: Text(tr('scan_network')),
           ),
           const SizedBox(height: 24),
           Text(
-            'api / api-ssl має бути ввімкнено на роутері '
-            '(IP → Services). Якщо не вдається підключитися, перевірте, '
-            'що сервіс api не вимкнений і не обмежений за адресами.',
+            tr('connect_hint'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

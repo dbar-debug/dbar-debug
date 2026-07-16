@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import 'account_screen.dart';
 import 'connect_screen.dart';
 import 'pushstats_screen.dart';
@@ -33,31 +34,31 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.router_outlined),
-            selectedIcon: Icon(Icons.router),
-            label: 'Збережені',
+            icon: const Icon(Icons.router_outlined),
+            selectedIcon: const Icon(Icons.router),
+            label: tr('tab_saved'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.lan_outlined),
-            selectedIcon: Icon(Icons.lan),
-            label: 'Підключення',
+            icon: const Icon(Icons.lan_outlined),
+            selectedIcon: const Icon(Icons.lan),
+            label: tr('tab_connect'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.dns_outlined),
-            selectedIcon: Icon(Icons.dns),
-            label: 'Команда',
+            icon: const Icon(Icons.dns_outlined),
+            selectedIcon: const Icon(Icons.dns),
+            label: tr('tab_team'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.donut_large_outlined),
-            selectedIcon: Icon(Icons.donut_large),
-            label: 'PushStats',
+            icon: const Icon(Icons.donut_large_outlined),
+            selectedIcon: const Icon(Icons.donut_large),
+            label: tr('tab_pushstats'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Акаунт',
+            icon: const Icon(Icons.person_outline),
+            selectedIcon: const Icon(Icons.person),
+            label: tr('tab_account'),
           ),
         ],
       ),

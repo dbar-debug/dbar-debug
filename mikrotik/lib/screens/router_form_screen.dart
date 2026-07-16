@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../models/router_device.dart';
 import '../services/router_store.dart';
 
@@ -73,10 +74,10 @@ class _RouterFormScreenState extends State<RouterFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.device == null
-            ? 'Новий роутер'
-            : 'Редагувати роутер'),
+            ? tr('router_new')
+            : tr('router_edit')),
         actions: [
-          TextButton(onPressed: _save, child: const Text('Зберегти')),
+          TextButton(onPressed: _save, child: Text(tr('save'))),
         ],
       ),
       body: Form(
@@ -86,23 +87,23 @@ class _RouterFormScreenState extends State<RouterFormScreen> {
           children: [
             TextFormField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Назва'),
+              decoration: InputDecoration(labelText: tr('field_name')),
             ),
             TextFormField(
               controller: _host,
-              decoration:
-                  const InputDecoration(labelText: 'IP або доменне ім\'я'),
+              decoration: InputDecoration(labelText: tr('field_host')),
               keyboardType: TextInputType.url,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Вкажіть адресу' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? tr('enter_address')
+                  : null,
             ),
             TextFormField(
               controller: _user,
-              decoration: const InputDecoration(labelText: 'Ім\'я користувача'),
+              decoration: InputDecoration(labelText: tr('field_user')),
             ),
             TextFormField(
               controller: _password,
-              decoration: const InputDecoration(labelText: 'Пароль'),
+              decoration: InputDecoration(labelText: tr('field_password')),
               obscureText: true,
             ),
             SwitchListTile(
@@ -113,17 +114,17 @@ class _RouterFormScreenState extends State<RouterFormScreen> {
             ),
             TextFormField(
               controller: _port,
-              decoration: const InputDecoration(
-                labelText: 'Порт',
-                helperText: 'За замовчуванням: api — 8728, api-ssl — 8729',
+              decoration: InputDecoration(
+                labelText: tr('field_port'),
+                helperText: tr('port_hint'),
               ),
               keyboardType: TextInputType.number,
             ),
             TextFormField(
               controller: _labels,
-              decoration: const InputDecoration(
-                labelText: 'Мітки',
-                helperText: 'Через кому, напр.: офіс, київ',
+              decoration: InputDecoration(
+                labelText: tr('field_labels'),
+                helperText: tr('labels_hint'),
               ),
             ),
           ],

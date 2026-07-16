@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
+
 /// Сканування локальної мережі: перебирає адреси x.x.x.1–254 і шукає
 /// відкритий порт RouterOS API (8728). Повертає вибрану IP через pop().
 class ScanScreen extends StatefulWidget {
@@ -60,7 +62,7 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Сканування мережі')),
+      appBar: AppBar(title: Text(tr('scan_title'))),
       body: Column(
         children: [
           Padding(
@@ -70,9 +72,9 @@ class _ScanScreenState extends State<ScanScreen> {
                 Expanded(
                   child: TextField(
                     controller: _subnet,
-                    decoration: const InputDecoration(
-                      labelText: 'Підмережа',
-                      helperText: 'Напр. 192.168.88 (скан .1–.254, порт 8728)',
+                    decoration: InputDecoration(
+                      labelText: tr('subnet'),
+                      helperText: tr('subnet_hint'),
                     ),
                   ),
                 ),
@@ -81,7 +83,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   onPressed: _scanning
                       ? () => setState(() => _scanning = false)
                       : _scan,
-                  child: Text(_scanning ? 'Стоп' : 'Сканувати'),
+                  child: Text(_scanning ? tr('stop') : tr('scan')),
                 ),
               ],
             ),
@@ -90,9 +92,8 @@ class _ScanScreenState extends State<ScanScreen> {
           Expanded(
             child: _found.isEmpty
                 ? Center(
-                    child: Text(_scanning
-                        ? 'Сканування…'
-                        : 'Роутери не знайдені. Запустіть сканування.'),
+                    child: Text(
+                        _scanning ? tr('scanning') : tr('scan_none')),
                   )
                 : ListView.builder(
                     itemCount: _found.length,

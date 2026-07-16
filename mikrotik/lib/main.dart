@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'l10n/strings.dart';
+import 'screens/auth_gate.dart';
 import 'screens/home_shell.dart';
 import 'services/app_settings.dart';
 import 'services/router_store.dart';
@@ -16,24 +19,39 @@ class MikrotikApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = AppSettings.instance;
+    // Перебудовуємо застосунок при зміні теми АБО мови.
     return ValueListenableBuilder<ThemeMode>(
-      valueListenable: AppSettings.instance.themeMode,
+      valueListenable: settings.themeMode,
       builder: (context, mode, _) {
-        return MaterialApp(
-          title: 'MikroTik Mobile',
-          debugShowCheckedModeBanner: false,
-          themeMode: mode,
-          theme: ThemeData(
-            colorSchemeSeed: Colors.blue,
-            brightness: Brightness.light,
-            useMaterial3: true,
-          ),
-          darkTheme: ThemeData(
-            colorSchemeSeed: Colors.blue,
-            brightness: Brightness.dark,
-            useMaterial3: true,
-          ),
-          home: const HomeShell(),
+        return ValueListenableBuilder<String>(
+          valueListenable: settings.language,
+          builder: (context, langCode, _) {
+            L.code = langCode; // глобальний доступ для tr()
+            return MaterialApp(
+              title: 'MikroTik Mobile',
+              debugShowCheckedModeBanner: false,
+              themeMode: mode,
+              locale: Locale(langCode),
+              supportedLocales: L.supported,
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              theme: ThemeData(
+                colorSchemeSeed: Colors.blue,
+                brightness: Brightness.light,
+                useMaterial3: true,
+              ),
+              darkTheme: ThemeData(
+                colorSchemeSeed: Colors.blue,
+                brightness: Brightness.dark,
+                useMaterial3: true,
+              ),
+              home: const AuthGate(child: HomeShell()),
+            );
+          },
         );
       },
     );
