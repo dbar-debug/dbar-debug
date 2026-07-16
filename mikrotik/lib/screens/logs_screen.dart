@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../services/routeros_client.dart';
 
 /// Журнали роутера (/log) з пошуком і підсвіткою помилок.
@@ -69,13 +70,13 @@ class _LogsScreenState extends State<LogsScreen> {
         title: _searching
             ? TextField(
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Пошук у журналі…',
+                decoration: InputDecoration(
+                  hintText: tr('logs_search'),
                   border: InputBorder.none,
                 ),
                 onChanged: (v) => setState(() => _query = v),
               )
-            : const Text('Журнали роутера'),
+            : Text(tr('router_logs')),
         actions: [
           IconButton(
             icon: Icon(_searching ? Icons.close : Icons.search),
@@ -90,7 +91,7 @@ class _LogsScreenState extends State<LogsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text('Помилка: $_error'))
+              ? Center(child: Text('${tr('error')}: $_error'))
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView.builder(

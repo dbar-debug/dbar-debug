@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/strings.dart';
 import '../services/metrics_collector.dart';
 import '../widgets/line_chart.dart';
 
@@ -51,7 +52,7 @@ class _ChartsTabState extends State<ChartsTab> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Графіки інтерфейсів'),
+          title: Text(tr('iface_charts')),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView(
@@ -76,10 +77,10 @@ class _ChartsTabState extends State<ChartsTab> {
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Скасувати')),
+                child: Text(tr('cancel'))),
             FilledButton(
                 onPressed: () => Navigator.pop(context, selected),
-                child: const Text('Готово')),
+                child: Text(tr('done'))),
           ],
         ),
       ),
@@ -102,7 +103,7 @@ class _ChartsTabState extends State<ChartsTab> {
           children: [
             _chartCard(
               context,
-              'Процесор, %',
+              tr('cpu_pct'),
               SimpleLineChart(
                 series: [
                   ChartSeries('Used', Colors.blue, c.cpuHistory),
@@ -112,7 +113,7 @@ class _ChartsTabState extends State<ChartsTab> {
             ),
             _chartCard(
               context,
-              'Пам\'ять, MB',
+              tr('mem_mb'),
               SimpleLineChart(
                 series: [
                   ChartSeries('Used', Colors.blue, c.memUsedHistory),
@@ -123,7 +124,7 @@ class _ChartsTabState extends State<ChartsTab> {
             for (final name in _selectedIfaces)
               _chartCard(
                 context,
-                'Швидкість інтерфейсу $name, Mbps',
+                '$name, Mbps',
                 SimpleLineChart(
                   series: [
                     ChartSeries('tx', Colors.blue,
@@ -138,7 +139,7 @@ class _ChartsTabState extends State<ChartsTab> {
             FilledButton.icon(
               onPressed: _pickInterfaces,
               icon: const Icon(Icons.add),
-              label: const Text('Додати діаграму інтерфейсу'),
+              label: Text(tr('add_iface_chart')),
             ),
           ],
         );

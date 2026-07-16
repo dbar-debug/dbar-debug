@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../services/metrics_collector.dart';
 import '../services/routeros_client.dart';
 import '../widgets/donut_chart.dart';
@@ -83,11 +84,11 @@ class DashboardTab extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 4),
-                      Text('Аптайм: ${resource['uptime'] ?? '…'}'),
+                      Text('${tr('uptime')}: ${resource['uptime'] ?? '…'}'),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Text('Трафік:  '),
+                          Text('${tr('traffic')}:  '),
                           Text('↑ ${formatBps(collector.aggregateTxBps)}',
                               style: const TextStyle(color: Colors.blue)),
                           const SizedBox(width: 12),
@@ -102,13 +103,13 @@ class DashboardTab extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _gauge(context, 'CPU', cpu / 100, '$cpu%'),
-              _gauge(context, 'Пам\'ять', memUsed,
+              _gauge(context, tr('memory'), memUsed,
                   '${(memUsed * 100).toStringAsFixed(0)}%'),
-              _gauge(context, 'Диск', diskUsed,
+              _gauge(context, tr('disk'), diskUsed,
                   '${(diskUsed * 100).toStringAsFixed(0)}%'),
               if (collector.ethernetStatus.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('Ethernet',
+                Text(tr('ethernet'),
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Card(
@@ -122,7 +123,7 @@ class DashboardTab extends StatelessWidget {
               ],
               if (segments.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('Типи інтерфейсів',
+                Text(tr('interface_types'),
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Card(

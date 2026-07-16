@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
+
 /// Port Knocking — послідовність "стуків" по портах перед підключенням,
 /// щоб роутер тимчасово відкрив доступ (правила firewall з address-list).
 class PortKnockScreen extends StatefulWidget {
@@ -66,11 +68,10 @@ class _PortKnockScreenState extends State<PortKnockScreen> {
         await Future<void>.delayed(Duration(milliseconds: delayMs));
       }
       if (mounted) {
-        setState(() => _status =
-            'Готово. Роутер має відкрити доступ — підключайтеся.');
+        setState(() => _status = tr('pk_done'));
       }
     } on Object catch (e) {
-      if (mounted) setState(() => _status = 'Помилка: $e');
+      if (mounted) setState(() => _status = '${tr('error')}: $e');
     } finally {
       if (mounted) setState(() => _knocking = false);
     }
@@ -79,32 +80,30 @@ class _PortKnockScreenState extends State<PortKnockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Port Knocking')),
+      appBar: AppBar(title: Text(tr('port_knocking'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
             controller: _host,
-            decoration:
-                const InputDecoration(labelText: 'IP або доменне ім\'я'),
+            decoration: InputDecoration(labelText: tr('field_host')),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _ports,
-            decoration: const InputDecoration(
-              labelText: 'Порти (через кому, по черзі)',
-              helperText: 'Напр.: 1000, 2000, 3000',
+            decoration: InputDecoration(
+              labelText: tr('pk_ports'),
+              helperText: tr('pk_ports_hint'),
             ),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _delay,
-            decoration: const InputDecoration(
-                labelText: 'Пауза між стуками, мс'),
+            decoration: InputDecoration(labelText: tr('pk_delay')),
             keyboardType: TextInputType.number,
           ),
           SwitchListTile(
-            title: const Text('UDP (замість TCP)'),
+            title: Text(tr('pk_udp')),
             contentPadding: EdgeInsets.zero,
             value: _udp,
             onChanged: (v) => setState(() => _udp = v),
@@ -112,7 +111,7 @@ class _PortKnockScreenState extends State<PortKnockScreen> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _knocking ? null : _knock,
-            child: Text(_knocking ? 'Стукаю…' : 'Постукати'),
+            child: Text(_knocking ? tr('pk_knocking') : tr('pk_knock')),
           ),
           if (_status != null)
             Padding(
@@ -121,9 +120,7 @@ class _PortKnockScreenState extends State<PortKnockScreen> {
             ),
           const SizedBox(height: 24),
           Text(
-            'На роутері має бути налаштований ланцюжок правил firewall, '
-            'який після правильної послідовності підключень додає вашу '
-            'адресу до address-list з дозволом доступу.',
+            tr('pk_hint'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

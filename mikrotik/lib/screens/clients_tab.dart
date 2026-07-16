@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../services/routeros_client.dart';
 
 class _ClientSource {
@@ -11,7 +12,7 @@ class _ClientSource {
   final String trailingTopKey;
   final String trailingBottomKey;
   final String? signalKey; // рівень сигналу (wireless)
-  final String removeLabel;
+  final String removeLabelKey; // ключ локалізації дії видалення
 
   const _ClientSource(
     this.label,
@@ -22,7 +23,7 @@ class _ClientSource {
     required this.trailingTopKey,
     required this.trailingBottomKey,
     this.signalKey,
-    required this.removeLabel,
+    required this.removeLabelKey,
   });
 }
 
@@ -43,7 +44,7 @@ class _ClientsTabState extends State<ClientsTab> {
         subtitleKey: 'mac-address',
         trailingTopKey: 'server',
         trailingBottomKey: 'host-name',
-        removeLabel: 'Видалити оренду'),
+        removeLabelKey: 'remove_lease'),
     _ClientSource('Wireless', '/interface/wireless/registration-table',
         titleKey: 'last-ip',
         fallbackTitleKey: 'mac-address',
@@ -51,19 +52,19 @@ class _ClientsTabState extends State<ClientsTab> {
         trailingTopKey: 'interface',
         trailingBottomKey: 'uptime',
         signalKey: 'signal-strength',
-        removeLabel: 'Роз\'єднати'),
+        removeLabelKey: 'disconnect'),
     _ClientSource('Hotspot', '/ip/hotspot/active',
         titleKey: 'user',
         subtitleKey: 'address',
         trailingTopKey: 'server',
         trailingBottomKey: 'uptime',
-        removeLabel: 'Завершити сеанс'),
+        removeLabelKey: 'end_session'),
     _ClientSource('PPP', '/ppp/active',
         titleKey: 'name',
         subtitleKey: 'address',
         trailingTopKey: 'service',
         trailingBottomKey: 'uptime',
-        removeLabel: 'Роз\'єднати'),
+        removeLabelKey: 'disconnect'),
   ];
 
   int _sourceIndex = 0;
@@ -173,7 +174,7 @@ class _ClientsTabState extends State<ClientsTab> {
                   foregroundColor: Theme.of(context).colorScheme.error,
                 ),
                 onPressed: () => _remove(source, item),
-                child: Text(source.removeLabel),
+                child: Text(tr(source.removeLabelKey)),
               ),
           ],
         ),
@@ -191,10 +192,10 @@ class _ClientsTabState extends State<ClientsTab> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Скасувати')),
+              child: Text(tr('cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Так')),
+              child: Text(tr('yes'))),
         ],
       ),
     );
@@ -242,11 +243,11 @@ class _ClientsTabState extends State<ClientsTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Пошук клієнта…',
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: tr('client_search'),
               isDense: true,
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
             ),
             onChanged: (v) => setState(() => _query = v),
           ),
@@ -255,7 +256,7 @@ class _ClientsTabState extends State<ClientsTab> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text('Всього: ${items.length}',
+            child: Text('${tr('total')}: ${items.length}',
                 style: Theme.of(context).textTheme.bodySmall),
           ),
         ),
@@ -267,8 +268,7 @@ class _ClientsTabState extends State<ClientsTab> {
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(
-                          'Помилка: $_error\n\n(Можливо, пакет не '
-                          'встановлений на цьому роутері)',
+                          '${tr('error')}: $_error\n\n${tr('pkg_missing')}',
                           textAlign: TextAlign.center,
                         ),
                       ),

@@ -185,6 +185,80 @@ class L {
     // PushStats (короткі)
     'ps_settings': {'uk': 'Налаштування', 'en': 'Settings'},
     'ps_install': {'uk': 'Встановити на роутер', 'en': 'Install on router'},
+
+    // Item list / edit (генеричні таблиці)
+    'selected': {'uk': 'Вибрано', 'en': 'Selected'},
+    'select_all': {'uk': 'Вибрати все', 'en': 'Select all'},
+    'enable': {'uk': 'Увімкнути', 'en': 'Enable'},
+    'disable': {'uk': 'Вимкнути', 'en': 'Disable'},
+    'delete_q': {'uk': 'Видалити?', 'en': 'Delete?'},
+    'delete_count': {'uk': 'Буде видалено елементів', 'en': 'Items to delete'},
+    'no_fields': {'uk': 'Немає полів для редагування', 'en': 'No editable fields'},
+    'item_new': {'uk': 'новий', 'en': 'new'},
+
+    // Ping/tools підсумки
+    'sent': {'uk': 'Надіслано', 'en': 'Sent'},
+    'received': {'uk': 'Отримано', 'en': 'Received'},
+    'loss': {'uk': 'Втрати', 'en': 'Loss'},
+    'ping_count': {'uk': 'Кількість пакетів', 'en': 'Packet count'},
+    'measure_cpu': {'uk': 'Виміряти навантаження', 'en': 'Measure load'},
+    'collecting': {'uk': 'Збір даних…', 'en': 'Collecting…'},
+    'btest_server': {'uk': 'Адреса btest-сервера', 'en': 'btest server address'},
+    'btest_hint': {
+      'uk': 'Інший MikroTik з увімкненим btest server',
+      'en': 'Another MikroTik with btest server enabled'
+    },
+    'duration_s': {'uk': 'Тривалість, секунд', 'en': 'Duration, seconds'},
+    'start_test': {'uk': 'Почати тест', 'en': 'Start test'},
+    'test_running': {'uk': 'Тест триває…', 'en': 'Test running…'},
+    'both': {'uk': 'Обидва', 'en': 'Both'},
+    'status': {'uk': 'Статус', 'en': 'Status'},
+
+    // Port knocking
+    'pk_ports': {'uk': 'Порти (через кому, по черзі)', 'en': 'Ports (comma-separated, in order)'},
+    'pk_ports_hint': {'uk': 'Напр.: 1000, 2000, 3000', 'en': 'E.g. 1000, 2000, 3000'},
+    'pk_delay': {'uk': 'Пауза між стуками, мс', 'en': 'Delay between knocks, ms'},
+    'pk_udp': {'uk': 'UDP (замість TCP)', 'en': 'UDP (instead of TCP)'},
+    'pk_knock': {'uk': 'Постукати', 'en': 'Knock'},
+    'pk_knocking': {'uk': 'Стукаю…', 'en': 'Knocking…'},
+    'pk_done': {
+      'uk': 'Готово. Роутер має відкрити доступ — підключайтеся.',
+      'en': 'Done. The router should open access — connect now.'
+    },
+    'pk_hint': {
+      'uk': 'На роутері має бути налаштований ланцюжок правил firewall, який після правильної послідовності підключень додає вашу адресу до address-list з дозволом доступу.',
+      'en': 'The router must have a firewall rule chain that, after the correct sequence of connections, adds your address to an allow address-list.'
+    },
+
+    // Команда
+    'choose': {'uk': 'Обрати', 'en': 'Choose'},
+    'team_intro': {
+      'uk': 'Спільний список роутерів для команди. Один роутер MikroTik виступає сховищем: maintainer публікує список, учасники синхронізують його собі.',
+      'en': 'A shared router list for your team. One MikroTik router acts as storage: the maintainer publishes the list, members sync it to themselves.'
+    },
+    'team_router': {'uk': 'Командний роутер', 'en': 'Team router'},
+    'team_not_selected': {'uk': 'Не обрано', 'en': 'Not selected'},
+    'team_pick_router': {'uk': 'Оберіть командний роутер', 'en': 'Choose team router'},
+    'team_need_router': {
+      'uk': 'Спершу додайте роутер у "Збережені"',
+      'en': 'First add a router in "Saved"'
+    },
+    'team_publish': {'uk': 'Опублікувати список', 'en': 'Publish list'},
+    'team_publish_hint': {
+      'uk': 'Вивантажує ваш список роутерів (без паролів) на командний роутер.',
+      'en': 'Uploads your router list (without passwords) to the team router.'
+    },
+    'team_sync': {'uk': 'Синхронізувати собі', 'en': 'Sync to me'},
+    'team_sync_hint': {
+      'uk': 'Завантажує список з командного роутера й додає роутери у "Збережені". Наявні паролі зберігаються.',
+      'en': 'Downloads the list from the team router and adds routers to "Saved". Existing passwords are kept.'
+    },
+    'team_published': {'uk': 'Список опубліковано', 'en': 'List published'},
+    'team_synced': {'uk': 'Синхронізовано', 'en': 'Synced'},
+    'team_security': {
+      'uk': 'Паролі ніколи не передаються в спільний список — кожен учасник вводить свої.',
+      'en': 'Passwords are never shared — each member enters their own.'
+    },
   };
 
   static String t(String key) {

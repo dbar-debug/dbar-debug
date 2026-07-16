@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../services/metrics_collector.dart';
 import '../services/routeros_client.dart';
 import 'scan_screen.dart';
@@ -19,35 +20,35 @@ class ToolsTab extends StatelessWidget {
       children: [
         ListTile(
           leading: const Icon(Icons.network_ping),
-          title: const Text('Ping'),
+          title: Text(tr('tool_ping')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => push(PingScreen(client: client)),
         ),
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.route),
-          title: const Text('Traceroute'),
+          title: Text(tr('tool_traceroute')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => push(TracerouteScreen(client: client)),
         ),
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.radar),
-          title: const Text('IP Scan (з телефона)'),
+          title: Text(tr('tool_ipscan')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => push(const ScanScreen()),
         ),
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.speed),
-          title: const Text('Bandwidth Test'),
+          title: Text(tr('tool_btest')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => push(BandwidthTestScreen(client: client)),
         ),
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.pie_chart),
-          title: const Text('Profile (навантаження CPU)'),
+          title: Text(tr('tool_profile')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => push(ProfileScreen(client: client)),
         ),
@@ -116,18 +117,18 @@ class _PingScreenState extends State<PingScreen> {
           TextField(
             controller: _address,
             decoration:
-                const InputDecoration(labelText: 'Адреса або домен'),
+                InputDecoration(labelText: tr('address_or_domain')),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _count,
-            decoration: const InputDecoration(labelText: 'Кількість пакетів'),
+            decoration: InputDecoration(labelText: tr('ping_count')),
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _running ? null : _run,
-            child: Text(_running ? 'Виконується…' : 'Ping'),
+            child: Text(_running ? tr('running') : 'Ping'),
           ),
           if (_error != null)
             Padding(

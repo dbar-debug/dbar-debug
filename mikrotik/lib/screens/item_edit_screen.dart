@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../config/menu_tree.dart';
 import '../services/routeros_client.dart';
 
@@ -119,7 +120,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     } on Object catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Помилка: $e')));
+          .showSnackBar(SnackBar(content: Text('${tr('error')}: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -136,7 +137,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.item == null
-            ? '${widget.table.title}: новий'
+            ? '${widget.table.title}: ${tr('item_new')}'
             : widget.table.title),
         actions: [
           IconButton(
@@ -151,7 +152,7 @@ class _ItemEditScreenState extends State<ItemEditScreen> {
         ],
       ),
       body: _fields.isEmpty
-          ? const Center(child: Text('Немає полів для редагування'))
+          ? Center(child: Text(tr('no_fields')))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [

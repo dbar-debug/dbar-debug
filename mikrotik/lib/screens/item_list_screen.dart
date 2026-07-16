@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../config/menu_tree.dart';
 import '../services/routeros_client.dart';
 import 'item_edit_screen.dart';
@@ -80,15 +81,15 @@ class _ItemListScreenState extends State<ItemListScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Видалити?'),
-        content: Text('Буде видалено елементів: ${ids.length}'),
+        title: Text(tr('delete_q')),
+        content: Text('${tr('delete_count')}: ${ids.length}'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Скасувати')),
+              child: Text(tr('cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Видалити')),
+              child: Text(tr('delete'))),
         ],
       ),
     );
@@ -137,12 +138,12 @@ class _ItemListScreenState extends State<ItemListScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Помилка: $_error',
+                        Text('${tr('error')}: $_error',
                             textAlign: TextAlign.center),
                         const SizedBox(height: 12),
                         FilledButton(
                             onPressed: _load,
-                            child: const Text('Повторити')),
+                            child: Text(tr('retry'))),
                       ],
                     ),
                   ),
@@ -150,9 +151,9 @@ class _ItemListScreenState extends State<ItemListScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: items.isEmpty
-                      ? ListView(children: const [
-                          SizedBox(height: 120),
-                          Center(child: Text('Порожньо')),
+                      ? ListView(children: [
+                          const SizedBox(height: 120),
+                          Center(child: Text(tr('empty'))),
                         ])
                       : ListView.builder(
                           itemCount: items.length,
@@ -173,8 +174,8 @@ class _ItemListScreenState extends State<ItemListScreen> {
       title: _searching
           ? TextField(
               autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Пошук…',
+              decoration: InputDecoration(
+                hintText: tr('search'),
                 border: InputBorder.none,
               ),
               onChanged: (v) => setState(() => _query = v),
@@ -203,27 +204,27 @@ class _ItemListScreenState extends State<ItemListScreen> {
         icon: const Icon(Icons.close),
         onPressed: () => setState(_selected.clear),
       ),
-      title: Text('Вибрано: ${_selected.length}'),
+      title: Text('${tr('selected')}: ${_selected.length}'),
       actions: [
         IconButton(
-          tooltip: 'Вибрати все',
+          tooltip: tr('select_all'),
           icon: const Icon(Icons.select_all),
           onPressed: () => setState(() => _selected
             ..clear()
             ..addAll(all)),
         ),
         IconButton(
-          tooltip: 'Увімкнути',
+          tooltip: tr('enable'),
           icon: const Icon(Icons.play_arrow),
           onPressed: () => _setDisabled(_selected.toList(), false),
         ),
         IconButton(
-          tooltip: 'Вимкнути',
+          tooltip: tr('disable'),
           icon: const Icon(Icons.pause),
           onPressed: () => _setDisabled(_selected.toList(), true),
         ),
         IconButton(
-          tooltip: 'Видалити',
+          tooltip: tr('delete'),
           icon: const Icon(Icons.delete_outline),
           onPressed: () => _remove(_selected.toList()),
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../services/metrics_collector.dart';
 import '../services/routeros_client.dart';
 import '../widgets/line_chart.dart';
@@ -44,11 +45,11 @@ class _InterfacesTabState extends State<InterfacesTab> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: TextField(
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Пошук інтерфейсу…',
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: tr('iface_search'),
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (v) => setState(() => _query = v),
               ),
@@ -227,8 +228,8 @@ class InterfaceDetailScreen extends StatelessWidget {
                     ? null
                     : () => _setDisabled(context, item, !disabled),
                 child: Text(disabled
-                    ? 'Увімкнути інтерфейс'
-                    : 'Вимкнути інтерфейс'),
+                    ? tr('iface_enable')
+                    : tr('iface_disable')),
               ),
             ],
           );
