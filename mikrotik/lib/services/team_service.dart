@@ -33,14 +33,6 @@ class TeamService {
     await prefs.setString(_teamRouterKey, id);
   }
 
-  static RouterDevice? _resolveTeamRouter(String? id) {
-    if (id == null) return null;
-    for (final r in RouterStore.instance.routers) {
-      if (r.id == id) return r;
-    }
-    return null;
-  }
-
   static Future<RouterOSClient> _connect(RouterDevice device) async {
     final client = RouterOSClient();
     await client.connect(device.host, device.effectivePort,

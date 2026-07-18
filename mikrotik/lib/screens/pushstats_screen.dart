@@ -131,6 +131,7 @@ class _PushStatsScreenState extends State<PushStatsScreen> {
     final config = _config;
     if (config == null) return;
     await RouterStore.instance.load();
+    if (!mounted) return;
     final routers = RouterStore.instance.routers;
     if (routers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
