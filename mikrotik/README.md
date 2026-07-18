@@ -161,13 +161,17 @@ flutter run
 platform :ios, '12.0'
 ```
 
-і додайте post-install хук (у кінець `ios/Podfile`), щоб узгодити
-deployment target усіх подів:
+У згенерованому `ios/Podfile` **уже є** блок `post_install` із рядком
+`flutter_additional_ios_build_settings(target)` — його чіпати не можна
+(саме він навчає поди бачити модуль `Flutter`). **Не створюйте другий
+`post_install`** — це зламає збірку з помилкою `No such module 'Flutter'`.
+Просто **доповніть існуючий** блок налаштуванням deployment target, щоб
+він виглядав так:
 
 ```ruby
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    flutter_additional_ios_build_settings(target)
+    flutter_additional_ios_build_settings(target)   # ← НЕ видаляти
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
     end
