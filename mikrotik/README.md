@@ -152,6 +152,48 @@ flutter run
 > - `NSFaceIDUsageDescription` — для Face ID при запуску (пакет
 >   `local_auth`).
 
+### iOS: версія платформи (обов'язково)
+
+Плагіни `flutter_secure_storage` і `local_auth` вимагають **iOS 12+**.
+Після `flutter create .` у `ios/Podfile` розкоментуйте перший рядок:
+
+```ruby
+platform :ios, '12.0'
+```
+
+і додайте post-install хук (у кінець `ios/Podfile`), щоб узгодити
+deployment target усіх подів:
+
+```ruby
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+    end
+  end
+end
+```
+
+Потім:
+
+```bash
+flutter clean && flutter pub get
+cd ios && pod repo update && pod install && cd ..
+flutter run
+```
+
+### Типові помилки збірки
+
+- **`Command PhaseScriptExecution failed with a nonzero exit code`** —
+  загальна обгортка Xcode; справжня причина в рядках вище в логу.
+  Найчастіше — не виставлений `platform :ios, '12.0'` (див. вище) або
+  не виконаний `pod install` після додавання плагінів.
+- **`Generated.xcconfig must exist`** — збирали через `Runner.xcodeproj`;
+  відкривайте `Runner.xcworkspace` і спершу `flutter pub get`.
+- **`Signing requires a development team`** — виберіть Team у
+  Signing & Capabilities.
+
 ## Дорожня карта (наступні фази)
 
 - [x] **Конфігурація**: interfaces, wireless, bridge, IP (addresses, firewall,
