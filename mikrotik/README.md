@@ -187,16 +187,38 @@ cd ios && pod repo update && pod install && cd ..
 flutter run
 ```
 
+### Swift Package Manager (вимкнути)
+
+Проєкт налаштований під **CocoaPods**. Нова SPM-інтеграція Flutter ще
+нестабільна й дає помилку `Missing package product
+'FlutterGeneratedPluginSwiftPackage'`. Вимкніть її один раз:
+
+```bash
+flutter config --no-enable-swift-package-manager
+```
+
+потім `flutter clean` і перегенеруйте `ios/` (`rm -rf ios && flutter
+create . --platforms=ios`), знову застосувавши правки Podfile/Info.plist.
+
 ### Типові помилки збірки
 
+- **`Missing package product 'FlutterGeneratedPluginSwiftPackage'`** —
+  увімкнений SPM; вимкніть його (див. вище) і перегенеруйте `ios/`.
 - **`Command PhaseScriptExecution failed with a nonzero exit code`** —
   загальна обгортка Xcode; справжня причина в рядках вище в логу.
   Найчастіше — не виставлений `platform :ios, '12.0'` (див. вище) або
   не виконаний `pod install` після додавання плагінів.
+- **`No such module 'Flutter'`** — у Podfile зламаний/подвоєний
+  `post_install`; має бути один блок із `flutter_additional_ios_build_settings(target)`.
+- **`Framework 'Pods_Runner' not found`** — конфіги подів не під'єдналися;
+  перевірте `#include?` у `Flutter/Debug.xcconfig` і `Release.xcconfig`.
 - **`Generated.xcconfig must exist`** — збирали через `Runner.xcodeproj`;
-  відкривайте `Runner.xcworkspace` і спершу `flutter pub get`.
+  відкривайте **`Runner.xcworkspace`** і спершу `flutter pub get`.
 - **`Signing requires a development team`** — виберіть Team у
   Signing & Capabilities.
+
+> Завжди відкривайте **`Runner.xcworkspace`**, а не `Runner.xcodeproj`,
+> і запускайте через `flutter run`.
 
 ## Дорожня карта (наступні фази)
 
