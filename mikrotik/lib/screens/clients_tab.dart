@@ -186,7 +186,7 @@ class _ClientsTabState extends State<ClientsTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(source.removeLabel),
+        title: Text(tr(source.removeLabelKey)),
         content: Text('${item[source.titleKey] ?? ''} '
             '(${item[source.subtitleKey] ?? ''})'),
         actions: [

@@ -21,16 +21,13 @@ class BiometricAuth {
 
   /// Запит автентифікації. true — успіх (або біометрія недоступна, щоб не
   /// заблокувати користувача назавжди).
+  ///
+  /// Використовуємо мінімальний виклик `authenticate(localizedReason:)`,
+  /// сумісний з усіма версіями local_auth (без обгортки options).
   Future<bool> authenticate(String reason) async {
     try {
       if (!await isAvailable()) return true;
-      return await _auth.authenticate(
-        localizedReason: reason,
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: false, // дозволити код-пароль як запасний варіант
-        ),
-      );
+      return await _auth.authenticate(localizedReason: reason);
     } on PlatformException {
       return false;
     }
