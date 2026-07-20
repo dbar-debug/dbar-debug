@@ -81,6 +81,10 @@ backend/
 ├── docker-compose.yml
 └── requirements.txt
 
+mikrotik-widget/
+├── mikrotik-status.js     # Віджет статусу MikroTik для iPhone (Scriptable)
+└── README.md              # Інструкція з налаштування
+
 mobile/
 ├── lib/
 │   ├── main.dart
