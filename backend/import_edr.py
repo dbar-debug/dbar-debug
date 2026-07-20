@@ -152,6 +152,28 @@ def _iter_subjects(proc):
             root.clear()  # прибираємо оброблені записи з кореня — памʼять стабільна
 
 
+def _tax(elem) -> str:
+    """Податкові статуси з EXCHANGE_DATA: типи реєстрів платника + чи чинний
+    (END_DATE порожня → чинний). Напр. «платник податків; платник єдиного
+    внеску (знято)»."""
+    seen: dict = {}
+    for ans in elem.findall("EXCHANGE_DATA/EXCHANGE_ANSWER"):
+        typ = (ans.findtext("TAX_PAYER_TYPE") or "").strip()
+        if not typ:
+            continue
+        short = typ.replace("Реєстр платників", "").strip()
+        active = not (ans.findtext("END_DATE") or "").strip()
+        seen[short] = seen.get(short, False) or active
+    parts = [f"платник {t}" + ("" if a else " (знято)") for t, a in seen.items()]
+    return "; ".join(parts)
+
+
+def _founder_share(text: str) -> str:
+    """«…; розмір частки - 1000,00 грн.» → «1000,00 грн.»."""
+    m = re.search(r"розмір частки\s*[-–]\s*(.+)$", text or "")
+    return m.group(1).strip().rstrip(".") if m else ""
+
+
 def _termination(elem) -> str:
     """Дата й причина припинення. Спершу TERMINATED_INFO
     («дата; номер; причина»), інакше структуроване «в стані припинення»
@@ -193,7 +215,7 @@ def _fop_rows(zip_path: str):
             if farmer:
                 extra.append("Сімейне фермерське господарство")
             yield ("ФОП", name, "", stan, reg_date, "", "",
-                   "; ".join(extra), _termination(elem))
+                   "; ".join(extra), _termination(elem), _tax(elem), "", "")
             n += 1
             if n % 500000 == 0:
                 print(f"[edr] ФОП прочитано: {n:,}")
@@ -235,27 +257,42 @@ def _uo_rows(zip_path: str):
             edrpou = (elem.findtext("EDRPOU") or "").strip()
             stan = (elem.findtext("STAN") or "").strip()
             opf = (elem.findtext("OPF") or "").strip()
+            short_name = (elem.findtext("SHORT_NAME") or "").strip()
+            capital = (elem.findtext("AUTHORIZED_CAPITAL") or "").strip()
+            mgmt = (elem.findtext("SUPERIOR_MANAGEMENT") or "").strip()
             reg = (elem.findtext("REGISTRATION") or "").strip()
             reg_date = reg.split(";")[0].strip() if reg else ""
             term = _termination(elem)
+            tax = _tax(elem)
 
-            # 1) сама юрособа
-            yield ("ЮО", name, edrpou, stan, reg_date, "", "", opf, term)
+            # 1) сама юрособа (org_name = скорочена назва)
+            yield ("ЮО", name, edrpou, stan, reg_date, "", short_name, opf,
+                   term, tax, capital, mgmt)
 
             # 2) повʼязані особи — дедуплікуємо ролі в межах одного запису
-            #    (та сама людина часто і засновник, і керівник/представник)
-            roles: dict = {}
+            #    (та сама людина часто і засновник, і керівник/представник);
+            #    для засновника додаємо його частку.
+            people: dict = {}
             for f in elem.findall("FOUNDERS/FOUNDER"):
-                p = _founder_person(f.text or "")
-                if p:
-                    roles.setdefault(p, set()).add("засновник")
+                txt = f.text or ""
+                p = _founder_person(txt)
+                if not p:
+                    continue
+                d = people.setdefault(p, {"roles": set(), "share": ""})
+                d["roles"].add("засновник")
+                share = _founder_share(txt)
+                if share:
+                    d["share"] = share
             for s in elem.findall("SIGNERS/SIGNER"):
                 p, r = _signer_person_role(s.text or "")
-                if p:
-                    roles.setdefault(p, set()).add(r or "підписант")
-            for person, rset in roles.items():
-                role = ", ".join(sorted(rset))
-                yield ("ЮО", person, edrpou, stan, reg_date, role, name, "", term)
+                if not p:
+                    continue
+                people.setdefault(p, {"roles": set(), "share": ""})["roles"].add(r or "підписант")
+            for person, d in people.items():
+                role = ", ".join(sorted(d["roles"]))
+                extra = f"Частка: {d['share']}" if d["share"] else ""
+                yield ("ЮО", person, edrpou, stan, reg_date, role, name,
+                       extra, term, "", "", "")
             n += 1
             if n % 500000 == 0:
                 print(f"[edr] ЮО прочитано: {n:,}")

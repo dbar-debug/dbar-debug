@@ -7,8 +7,11 @@ class EdrRecord {
   final String regDate;  // дата держреєстрації
   final String role;     // для ЮО: керівник / засновник (у ФОП порожній)
   final String orgName;      // назва юрособи (для рядків керівника/засновника)
-  final String extra;        // управитель майна, фермерське господарство тощо
+  final String extra;        // управитель майна, частка засновника тощо
   final String termination;  // дата й причина припинення
+  final String tax;          // податкові статуси (платник податків/ЄСВ)
+  final String capital;      // статутний капітал (юрособа)
+  final String mgmt;         // орган управління (юрособа)
 
   EdrRecord({
     required this.kind,
@@ -20,6 +23,9 @@ class EdrRecord {
     required this.orgName,
     required this.extra,
     required this.termination,
+    required this.tax,
+    required this.capital,
+    required this.mgmt,
   });
 
   factory EdrRecord.fromJson(Map<String, dynamic> j) => EdrRecord(
@@ -32,6 +38,9 @@ class EdrRecord {
         orgName: j['org_name'] as String? ?? '',
         extra: j['extra'] as String? ?? '',
         termination: j['termination'] as String? ?? '',
+        tax: j['tax'] as String? ?? '',
+        capital: j['capital'] as String? ?? '',
+        mgmt: j['mgmt'] as String? ?? '',
       );
 
   /// Чи чинний запис (не припинено).

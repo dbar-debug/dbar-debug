@@ -207,6 +207,14 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
                 Text('з ${r.regDate}',
                     style: Theme.of(context).textTheme.bodySmall),
             ]),
+            if (r.capital.isNotEmpty)
+              _edrRow(Icons.savings_outlined,
+                  'Статутний капітал: ${r.capital} грн', scheme.onSurfaceVariant),
+            if (r.mgmt.isNotEmpty)
+              _edrRow(Icons.groups_outlined,
+                  'Орган управління: ${r.mgmt}', scheme.onSurfaceVariant),
+            if (r.tax.isNotEmpty)
+              _edrRow(Icons.receipt_long_outlined, r.tax, scheme.tertiary),
             if (r.extra.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(r.extra, style: Theme.of(context).textTheme.bodySmall),
@@ -243,6 +251,19 @@ class _PersonSearchScreenState extends State<PersonSearchScreen> {
         child: Text(text,
             style: TextStyle(
                 color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+      );
+
+  Widget _edrRow(IconData icon, String text, Color color) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Expanded(
+                child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+          ],
+        ),
       );
 
   Widget _caseCard(PersonCase c) {
