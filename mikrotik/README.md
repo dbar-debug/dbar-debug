@@ -1,0 +1,262 @@
+# MikroTik Mobile
+
+Власний додаток для iPhone для керування роутерами MikroTik RouterOS —
+аналог WinboxMobile. Flutter, без проміжного сервера: додаток спілкується
+з роутером напряму через бінарний протокол RouterOS API (api / api-ssl).
+
+## Що вже працює (фаза 1)
+
+- **5 вкладок** як у WinboxMobile: Збережені | Підключення | Команда |
+  PushStats | Акаунт
+- **Клієнт RouterOS API** (`lib/services/routeros_client.dart`):
+  - бінарний протокол api (порт 8728) та api-ssl (8729, самопідписані
+    сертифікати приймаються)
+  - логін для RouterOS ≥ 6.43 (plain) та < 6.43 (MD5 challenge-response) —
+    підтримка версій 5.xx – 7.xx
+- **Збережені**: список роутерів з пошуком (назва / IP / мітки),
+  перетягуванням, редагуванням, мітками; підключення по тапу
+- **Швидке підключення**: IP + користувач + пароль + SSL + порт,
+  автозбереження успішного підключення як "Auto saved"
+- **Сканування локальної мережі**: пошук роутерів по підмережі
+  (відкритий порт 8728)
+- **Дашборд**: ідентичність, модель, версія RouterOS, аптайм,
+  CPU / пам'ять / диск, список інтерфейсів зі швидкістю ↑/↓ у реальному часі
+- **Акаунт**: темний режим (Авто / Світла / Темна)
+
+## Фаза 2 — керування роутером (готово)
+
+- **Бокове меню** на дашборді: Налаштування роутера, Журнали, Port Knocking,
+  Вимкнення, Перезавантаження (з підтвердженням)
+- **Налаштування роутера** — універсальний браузер конфігурації
+  (`lib/config/menu_tree.dart` + генеричні екрани): CAPsMAN, Interfaces,
+  Wireless, Bridge, PPP, Switch, Mesh, IP (Addresses, ARP, DHCP, DNS,
+  **Firewall: Filter/NAT/Mangle/Raw/Service Ports/Connections/Address
+  Lists**, Pool, Routes, Services), IPv6, Routing, System, Queues, Radius,
+  Files
+- **Список елементів** у стилі карток Winbox: пошук, бейдж
+  enabled/disabled, коментарі `;;;`, pull-to-refresh
+- **Пакетні дії**: довге натискання → вибір кількох → увімкнути /
+  вимкнути / видалити / вибрати все
+- **Редактор елемента** з секціями Comment/Disable | General | Advanced |
+  Action (для firewall — повний набір полів як у Winbox); для інших таблиць
+  — генеричний редактор за атрибутами
+- **Журнали роутера** з пошуком і підсвіткою error/warning
+- **Port Knocking**: послідовність TCP/UDP-стуків із налаштованою паузою
+
+## Фаза 3 — сесія роутера з вкладками (готово)
+
+- **Оболонка сесії** з нижніми вкладками, як у WinboxMobile:
+  Dashboard | Clients | Interfaces | Charts | Tools
+  (`lib/screens/connected_shell.dart`); бокове меню перенесено сюди
+- **MetricsCollector** (`lib/services/metrics_collector.dart`) — єдине
+  опитування resource + interfaces раз на 3 с живить одразу дашборд,
+  інтерфейси і графіки; веде історію ~3 хв
+- **Clients**: перемикач DHCP | Wireless | PPP | Hotspot, пошук, лічильник
+- **Interfaces**: групування за типом, живі швидкості ↑/↓; детальний екран
+  інтерфейсу з живим графіком tx/rx, властивостями та
+  увімкненням/вимкненням
+- **Charts**: власний віджет графіків на CustomPainter (без сторонніх
+  бібліотек) — CPU, пам'ять + діаграми вибраних інтерфейсів; вибір
+  зберігається окремо для кожного роутера
+- **Tools**: Ping (живий вивід, підсумок RTT/втрат), Traceroute,
+  Bandwidth Test (напрямок TX/RX/обидва, жива швидкість), Profile
+  (навантаження CPU за процесами), IP Scan з телефона
+- **Стрімінг у клієнті API**: `talk(..., onReply:)` віддає !re-відповіді
+  в міру надходження
+
+## Фаза 4 — фінальні деталі дашборда і клієнтів (готово)
+
+- **Dashboard**: сукупний трафік роутера (`monitor-traffic aggregate`),
+  статус Ethernet-портів з узгодженою швидкістю лінка
+  (`/interface/ethernet/monitor`, зелений/сірий індикатор, 1Gbps/100Mbps),
+  кільцева діаграма "Типи інтерфейсів" з легендою
+- **Interfaces**: рядок aggregate із сукупним трафіком над групами
+- **Clients**: список у стилі WinboxMobile — іконка рівня сигналу Wi-Fi
+  (зелена/помаранчева/червона за dBm), IP + MAC + інтерфейс + аптайм;
+  тап відкриває деталі клієнта з усіма атрибутами та дією
+  "Роз'єднати / Видалити оренду / Завершити сеанс"
+
+## Фаза 5 — PushStats (готово)
+
+Пасивний моніторинг за схемою конкурента (розібрана в
+`reference/README.md`), повністю свій стек:
+
+- **Сервер** `pushstats-server/` (FastAPI + SQLite, Docker):
+  `POST /push` приймає статистику від роутерів, зберігає часові ряди
+  (14 днів), віддає додатку список роутерів та історію; алерти
+  CPU/пам'ять/диск ≥ порога та "роутер офлайн" — у лог і на вебхук
+  (`ALERT_WEBHOOK_URL`, найпростіше — ntfy.sh для push на iPhone).
+  Ізоляція користувачів за токеном. Схема перевірена тестами.
+- **RouterOS-скрипт** (`lib/services/pushstats_installer.dart`):
+  збирає resource, health, лічильники клієнтів (все обгорнуто в
+  `:do on-error` — відсутні пакети не ламають пуш), aggregate-трафік і
+  шле POST через `/tool fetch` кожні 5 хв. Додаток сам встановлює
+  скрипт + scheduler на роутер через API одним тапом (і вміє видаляти).
+- **Вкладка PushStats**: налаштування (URL сервера + генерація токена),
+  встановлення на роутер зі списку збережених, картки роутерів
+  (онлайн-статус, CPU/Mem/Disk, трафік, версія, час останніх даних),
+  детальний екран з графіками за 3 год / 24 год / 7 днів і лічильниками
+  клієнтів.
+
+Розгортання сервера: див. `pushstats-server/README.md`.
+
+## Фаза 6 — безпека, файли, локалізація (готово)
+
+- **Face ID / Touch ID + Keychain**: паролі роутерів перенесено з
+  shared_preferences у Keychain (`flutter_secure_storage`) — більше не
+  зберігаються у відкритому вигляді; старі записи мігрують автоматично.
+  Опційний біометричний замок при запуску (`local_auth`, вмикається в
+  Акаунті) — екран блокування до успішної автентифікації.
+- **Файли (backup/restore)** у боковому меню сесії: створення backup
+  (`/system/backup/save`) і export `.rsc` (`/export`), перегляд вмісту
+  текстових файлів, відновлення з backup (`/system/backup/load`),
+  видалення, розмір і дата.
+- **Локалізація uk/en**: перемикач мови в Акаунті, словник
+  `lib/l10n/strings.dart` + глобальний `tr('key')`; локалізовано основний
+  UI (навігація, Збережені, Підключення, Сканування, Акаунт, Файли,
+  бокове меню, форма роутера). Технічні терміни RouterOS (Interfaces,
+  Firewall, chain, action…) навмисно не перекладаються — вони спільні для
+  обох мов. Нові рядки додаються одним записом у словник.
+
+## Фаза 7 — Команда + доведена локалізація (готово)
+
+- **Вкладка «Команда»** (`lib/services/team_service.dart` + `team_screen.dart`):
+  спільний список роутерів через «командний роутер» — maintainer публікує
+  список (**без паролів**) у скрипт `mm-team-list` на вибраному роутері,
+  учасники синхронізують його собі (наявні паролі зберігаються, нові
+  роутери додаються з порожнім паролем). Працює на RouterOS 6 і 7.
+- **Локалізація** доведена до основних та глибоких екранів: журнали,
+  Port Knocking, інструменти (список + Ping), клієнти, інтерфейси,
+  графіки, генеричні списки/редактор конфігурації, дашборд, налаштування
+  роутера. Технічні поля деяких інструментів (Bandwidth/Traceroute)
+  лишаються технічними.
+
+### Що лишилось
+
+- [ ] Нативні APNs-push (потрібен Apple Developer акаунт; поки — вебхук/ntfy)
+- [ ] iCloud-синхронізація списку роутерів
+
+## Запуск
+
+```bash
+cd mikrotik
+flutter create . --platforms=ios,android   # згенерувати платформні папки
+flutter pub get
+flutter run
+```
+
+> **iOS, дозволи:** після `flutter create .` додайте в
+> `ios/Runner/Info.plist`:
+> - `NSLocalNetworkUsageDescription` — для сканування/підключення по
+>   локальній мережі (iOS 14+ питає дозвіл);
+> - `NSFaceIDUsageDescription` — для Face ID при запуску (пакет
+>   `local_auth`).
+
+### iOS: версія платформи (обов'язково)
+
+Плагіни `flutter_secure_storage` і `local_auth` вимагають **iOS 12+**.
+Після `flutter create .` у `ios/Podfile` розкоментуйте перший рядок:
+
+```ruby
+platform :ios, '12.0'
+```
+
+У згенерованому `ios/Podfile` **уже є** блок `post_install` із рядком
+`flutter_additional_ios_build_settings(target)` — його чіпати не можна
+(саме він навчає поди бачити модуль `Flutter`). **Не створюйте другий
+`post_install`** — це зламає збірку з помилкою `No such module 'Flutter'`.
+Просто **доповніть існуючий** блок налаштуванням deployment target, щоб
+він виглядав так:
+
+```ruby
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)   # ← НЕ видаляти
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+    end
+  end
+end
+```
+
+Потім:
+
+```bash
+flutter clean && flutter pub get
+cd ios && pod repo update && pod install && cd ..
+flutter run
+```
+
+### Swift Package Manager (вимкнути)
+
+Проєкт налаштований під **CocoaPods**. Нова SPM-інтеграція Flutter ще
+нестабільна й дає помилку `Missing package product
+'FlutterGeneratedPluginSwiftPackage'`. Вимкніть її один раз:
+
+```bash
+flutter config --no-enable-swift-package-manager
+```
+
+потім `flutter clean` і перегенеруйте `ios/` (`rm -rf ios && flutter
+create . --platforms=ios`), знову застосувавши правки Podfile/Info.plist.
+
+### Типові помилки збірки
+
+- **`Missing package product 'FlutterGeneratedPluginSwiftPackage'`** —
+  увімкнений SPM; вимкніть його (див. вище) і перегенеруйте `ios/`.
+- **`Command PhaseScriptExecution failed with a nonzero exit code`** —
+  загальна обгортка Xcode; справжня причина в рядках вище в логу.
+  Найчастіше — не виставлений `platform :ios, '12.0'` (див. вище) або
+  не виконаний `pod install` після додавання плагінів.
+- **`No such module 'Flutter'`** — у Podfile зламаний/подвоєний
+  `post_install`; має бути один блок із `flutter_additional_ios_build_settings(target)`.
+- **`Framework 'Pods_Runner' not found`** — конфіги подів не під'єдналися;
+  перевірте `#include?` у `Flutter/Debug.xcconfig` і `Release.xcconfig`.
+- **`Generated.xcconfig must exist`** — збирали через `Runner.xcodeproj`;
+  відкривайте **`Runner.xcworkspace`** і спершу `flutter pub get`.
+- **`Signing requires a development team`** — виберіть Team у
+  Signing & Capabilities.
+
+> Завжди відкривайте **`Runner.xcworkspace`**, а не `Runner.xcodeproj`,
+> і запускайте через `flutter run`.
+
+## Дорожня карта (наступні фази)
+
+- [x] **Конфігурація**: interfaces, wireless, bridge, IP (addresses, firewall,
+      DHCP), queues, system — фаза 2
+- [x] **Логи** роутера з пошуком — фаза 2
+- [x] **Port Knocking** перед підключенням — фаза 2
+- [x] **Клієнти**: DHCP / Wireless / PPP / Hotspot — фаза 3
+- [x] **Інтерфейси**: екран з графіками rx/tx — фаза 3
+- [x] **Інструменти**: Ping, Traceroute, Bandwidth Test, Profile — фаза 3
+- [x] **Графіки**: групи діаграм CPU/пам'ять/інтерфейси — фаза 3
+- [ ] **Файли**: backup / restore
+- [x] **Команда**: спільний список роутерів через "командний роутер"
+      (роутер MikroTik як сховище) — фаза 7
+- [x] **PushStats**: пасивний моніторинг + сповіщення (вебхук/ntfy) —
+      фаза 5; нативні APNs-push — окремо (потрібен ключ Apple Developer)
+- [ ] Безпека: паролі у Keychain (flutter_secure_storage), Face ID при
+      запуску, резервна копія в iCloud
+- [ ] Локалізація (укр/англ)
+
+## Структура
+
+```
+lib/
+├── main.dart                      # запуск, тема
+├── models/router_device.dart      # модель збереженого роутера
+├── services/
+│   ├── routeros_client.dart       # протокол RouterOS API
+│   ├── router_store.dart          # сховище збережених роутерів
+│   └── app_settings.dart          # налаштування (тема)
+└── screens/
+    ├── home_shell.dart            # 5 вкладок
+    ├── saved_screen.dart          # Збережені
+    ├── router_form_screen.dart    # додати/редагувати роутер
+    ├── connect_screen.dart        # Швидке підключення
+    ├── scan_screen.dart           # сканування підмережі
+    ├── dashboard_screen.dart      # дашборд роутера
+    ├── team_screen.dart           # Команда (заглушка)
+    ├── pushstats_screen.dart      # PushStats (заглушка)
+    └── account_screen.dart        # Акаунт / налаштування
+```

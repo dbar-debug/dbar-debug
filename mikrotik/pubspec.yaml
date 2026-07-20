@@ -1,0 +1,27 @@
+name: mikrotik_mobile
+description: Керування роутерами MikroTik RouterOS з iPhone (аналог WinboxMobile).
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  shared_preferences: ^2.2.3
+  crypto: ^3.0.3
+  http: ^1.2.1
+  flutter_secure_storage: ^9.2.2
+  local_auth: ^2.3.0
+  flutter_localizations:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
