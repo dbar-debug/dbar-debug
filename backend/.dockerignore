@@ -1,0 +1,14 @@
+# Секрети й локальні дані не мають потрапляти в Docker-образ
+.env
+.env.*
+!.env.example
+sessions/
+debug_output/
+data/
+*.jks
+*.pfx
+*.p12
+*.dat
+__pycache__/
+*.pyc
+.git

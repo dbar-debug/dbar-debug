@@ -2,7 +2,8 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # лише localhost; назовні — через nginx
     restart: unless-stopped
+    env_file: .env   # API_TOKEN, KEP_FILE_PATH, KEP_PASSWORD — у runtime, не в образі
     environment:
       - PYTHONUNBUFFERED=1

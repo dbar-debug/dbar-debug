@@ -4,10 +4,9 @@ import urllib.request
 
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 from app.scraper import search_by_name
-from app.cabinet_auth import get_session, clear_session
+from app.cabinet_auth import get_session
 from app.cabinet_scraper import get_my_cases, get_case_documents, get_document_file, get_calendar_events, get_cabinet_hearings
 from app.hearings import get_hearings_for_cases, get_hearings_for_name
 from app.status import get_status_for_name
@@ -15,6 +14,7 @@ from app import decisions_db
 from app import debtors_db
 from app import edr_db
 from app.models import SearchResult
+from app.security import TokenAuthMiddleware
 
 CABINET_URL = "https://cabinet.court.gov.ua"
 
@@ -22,8 +22,17 @@ app = FastAPI(
     title="Court Cases API",
     description="Пошук судових справ в реєстрі України",
     version="0.1.0",
+    # Swagger/OpenAPI вимкнено за замовчуванням: не рекламуємо API назовні.
+    # Для локальної розробки: ENABLE_DOCS=1
+    docs_url="/docs" if os.getenv("ENABLE_DOCS") == "1" else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if os.getenv("ENABLE_DOCS") == "1" else None,
 )
 
+# Порядок важливий: middleware, доданий останнім, — зовнішній. CORS має бути
+# зовні, щоб і відповіді 401 мали CORS-заголовки (інакше web-клієнт не
+# побачить текст помилки).
+app.add_middleware(TokenAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Обмежити після запуску Flutter-додатку
@@ -32,28 +41,9 @@ app.add_middleware(
 )
 
 
-class LoginRequest(BaseModel):
-    kep_file: str   # абсолютний шлях до .jks файлу на сервері
-    password: str
-    ca_name: str = 'КНЕДП АЦСК АТ КБ "ПРИВАТБАНК"'
-
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-@app.post("/cabinet/login")
-async def cabinet_login(req: LoginRequest):
-    """Авторизація через КЕП. Зберігає сесію на сервері."""
-    try:
-        clear_session()  # примусова свіжа авторизація
-        session = await get_session(req.kep_file, req.password, req.ca_name)
-        return {"status": "ok", "cookies_count": len(session["cookies"])}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=401, detail=str(e))
 
 
 @app.get("/cabinet/cases")

@@ -101,8 +101,9 @@ def _download_and_filter_by_name(name_norm: str) -> List[dict]:
     hearings = _stream_and_collect(
         lambda row: name_norm in _normalize(row[5])
     )
-    print(f"[hearings] Знайдено {len(hearings)} засідань для «{name_norm}»")
-    return hearings
+    # ПІБ у лог не пишемо (персональні дані); обрізаємо до того ж ліміту, що й БД
+    print(f"[hearings] Знайдено {len(hearings)} засідань за ПІБ")
+    return hearings[:hearings_db.MAX_RESULTS]
 
 
 def _stream_and_collect(predicate) -> List[dict]:

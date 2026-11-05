@@ -10,7 +10,9 @@ set -euo pipefail
 
 # Абсолютний шлях до папки backend (підправте, якщо інший)
 BACKEND_DIR="${BACKEND_DIR:-$HOME/court-app/backend}"
-HOST="${HOST:-0.0.0.0}"
+# Лише localhost: назовні бекенд доступний тільки через nginx (ліміти, лог
+# без персональних даних). 0.0.0.0 відкрив би :8000 напряму в обхід nginx.
+HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 
 cd "$BACKEND_DIR"
@@ -25,4 +27,5 @@ if [ -f "$BACKEND_DIR/.env" ]; then
 fi
 
 echo "[start-backend] Запускаю uvicorn на $HOST:$PORT (dir=$BACKEND_DIR)"
-exec python3 -m uvicorn app.main:app --host "$HOST" --port "$PORT" $ENV_ARG
+# --no-access-log: access-лог uvicorn пише query string (ПІБ, РНОКПП, токен)
+exec python3 -m uvicorn app.main:app --host "$HOST" --port "$PORT" --no-access-log $ENV_ARG

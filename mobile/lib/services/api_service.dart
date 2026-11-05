@@ -10,6 +10,7 @@ import '../models/person_case.dart';
 
 const _defaultBaseUrl = 'https://court-app.duckdns.org';
 const _baseUrlPrefKey = 'backend_base_url';
+const _apiTokenPrefKey = 'backend_api_token';
 
 class ApiException implements Exception {
   final String message;
@@ -32,6 +33,38 @@ class ApiService {
     await prefs.setString(_baseUrlPrefKey, trimmed);
   }
 
+  /// Токен доступу до API (той самий, що API_TOKEN у .env на сервері).
+  static Future<String> getApiToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_apiTokenPrefKey) ?? '';
+  }
+
+  static Future<void> setApiToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_apiTokenPrefKey, token.trim());
+  }
+
+  /// GET з заголовком Authorization: Bearer <токен>.
+  Future<http.Response> _get(Uri uri, Duration timeout) async {
+    final token = await getApiToken();
+    final headers = <String, String>{
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+    return http.get(uri, headers: headers).timeout(timeout);
+  }
+
+  /// Посилання, що відкриваються напряму в браузері/iframe (без можливості
+  /// передати заголовок), несуть токен у query-параметрі ?key=.
+  Future<Uri> _fileUri(String base, String path, bool download) async {
+    final token = await getApiToken();
+    final params = <String, String>{
+      if (download) 'download': '1',
+      if (token.isNotEmpty) 'key': token,
+    };
+    final uri = Uri.parse('$base$path');
+    return params.isEmpty ? uri : uri.replace(queryParameters: params);
+  }
+
   Future<List<CourtCase>> searchByName(String name, {int pages = 1}) async {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/search').replace(queryParameters: {
@@ -39,7 +72,7 @@ class ApiService {
       'pages': '$pages',
     });
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final response = await _get(uri, const Duration(seconds: 30));
     final body = _decodeOrThrow(response);
 
     final cases = (body['cases'] as List<dynamic>? ?? [])
@@ -53,7 +86,7 @@ class ApiService {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/cabinet/cases');
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final response = await _get(uri, const Duration(seconds: 60));
     final body = _decodeOrThrow(response);
 
     final cases = (body['cases'] as List<dynamic>? ?? [])
@@ -67,7 +100,7 @@ class ApiService {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/cabinet/cases/$caseId/documents');
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final response = await _get(uri, const Duration(seconds: 60));
     final body = _decodeOrThrow(response);
 
     final docs = (body['documents'] as List<dynamic>? ?? [])
@@ -83,15 +116,14 @@ class ApiService {
   /// Content-Disposition: attachment (для збереження).
   Future<Uri> documentFileUrl(String docId, {bool download = false}) async {
     final base = await getBaseUrl();
-    final suffix = download ? '?download=1' : '';
-    return Uri.parse('$base/cabinet/documents/$docId/file$suffix');
+    return _fileUri(base, '/cabinet/documents/$docId/file', download);
   }
 
   Future<List<CalendarEvent>> getCalendarEvents() async {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/cabinet/calendar');
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 120));
+    final response = await _get(uri, const Duration(seconds: 120));
     final body = _decodeOrThrow(response);
 
     final events = (body['events'] as List<dynamic>? ?? [])
@@ -105,7 +137,7 @@ class ApiService {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/cabinet/hearings');
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 120));
+    final response = await _get(uri, const Duration(seconds: 120));
     final body = _decodeOrThrow(response);
 
     final hearings = (body['hearings'] as List<dynamic>? ?? [])
@@ -121,7 +153,7 @@ class ApiService {
     final uri = Uri.parse('$base/hearings/by-name')
         .replace(queryParameters: {'name': name});
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final response = await _get(uri, const Duration(seconds: 60));
     final body = _decodeOrThrow(response);
 
     final hearings = (body['hearings'] as List<dynamic>? ?? [])
@@ -136,7 +168,7 @@ class ApiService {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/person/cases').replace(queryParameters: {'name': name});
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    final response = await _get(uri, const Duration(seconds: 60));
     final body = _decodeOrThrow(response);
 
     return (body['cases'] as List<dynamic>? ?? [])
@@ -149,8 +181,7 @@ class ApiService {
   /// [download] додає ?download=1 — віддає оригінальний .rtf.
   Future<Uri> decisionFileUrl(String docId, {bool download = false}) async {
     final base = await getBaseUrl();
-    final suffix = download ? '?download=1' : '';
-    return Uri.parse('$base/decisions/$docId/file$suffix');
+    return _fileUri(base, '/decisions/$docId/file', download);
   }
 
   /// Рішення ЄДРСР за номером справи — /decisions/by-case.
@@ -159,7 +190,7 @@ class ApiService {
     final uri = Uri.parse('$base/decisions/by-case')
         .replace(queryParameters: {'number': caseNumber});
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final response = await _get(uri, const Duration(seconds: 30));
     final body = _decodeOrThrow(response);
 
     return (body['decisions'] as List<dynamic>? ?? [])
@@ -173,7 +204,7 @@ class ApiService {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/debtors/search').replace(queryParameters: {'q': q});
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final response = await _get(uri, const Duration(seconds: 30));
     final body = _decodeOrThrow(response);
 
     return (body['debtors'] as List<dynamic>? ?? [])
@@ -187,7 +218,7 @@ class ApiService {
     final base = await getBaseUrl();
     final uri = Uri.parse('$base/edr/search').replace(queryParameters: {'q': q});
 
-    final response = await http.get(uri).timeout(const Duration(seconds: 30));
+    final response = await _get(uri, const Duration(seconds: 30));
     final body = _decodeOrThrow(response);
 
     return (body['records'] as List<dynamic>? ?? [])

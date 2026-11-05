@@ -19,6 +19,21 @@ from typing import Iterable, List, Set
 _DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "hearings.db")
 DB_PATH = os.getenv("HEARINGS_DB_PATH", _DEFAULT_DB)
 
+# Максимум рядків на один запит: без ліміту один запит на кшталт
+# «позивач відповідач» вивантажував би всю базу засідань.
+MAX_RESULTS = int(os.getenv("HEARINGS_MAX_RESULTS", "500"))
+
+# Службові слова з поля case_involved («Позивач: … відповідач: …»). Вони є
+# майже в кожному рядку, тож як пошукові токени перетворюють пошук за ПІБ
+# на вибірку всієї таблиці — відкидаємо їх.
+_STOPWORDS = frozenset({
+    "позивач", "позивач:", "позивачі", "відповідач", "відповідач:", "відповідачі",
+    "третя", "треті", "особа", "особа:", "особи", "особи:", "заявник", "заявник:",
+    "заінтересована", "скаржник", "скаржник:", "обвинувачений", "обвинувачений:",
+    "потерпілий", "потерпілий:", "боржник", "боржник:", "стягувач", "стягувач:",
+    "та", "і", "й", "до", "про", "від", "на", "за", "без", "самостійних", "вимог",
+})
+
 _COLS = ["date", "time", "case_number", "court_name", "judges",
          "case_involved", "case_description", "court_room"]
 
@@ -95,8 +110,8 @@ def build(rows: Iterable[dict]) -> int:
 
 def query_by_name(name_norm: str) -> List[dict]:
     """Пошук засідань, де ПІБ фігурує серед учасників (FTS5)."""
-    tokens = [t for t in name_norm.split() if len(t) > 1]
-    if not tokens:
+    tokens = [t for t in name_norm.split() if len(t) > 1 and t not in _STOPWORDS]
+    if not tokens or max(len(t) for t in tokens) < 3:
         return []
     # Кожен токен у лапках (щоб не сплутати з операторами FTS), зʼєднані AND
     match_expr = " AND ".join('"' + t.replace('"', '') + '"' for t in tokens)
@@ -106,8 +121,8 @@ def query_by_name(name_norm: str) -> List[dict]:
         cur = conn.execute(
             f"SELECT {','.join(_COLS)} FROM hearings"
             " WHERE id IN (SELECT rowid FROM hearings_fts WHERE hearings_fts MATCH ?)"
-            " ORDER BY date, time",
-            (match_expr,),
+            " ORDER BY date, time LIMIT ?",
+            (match_expr, MAX_RESULTS),
         )
         return [dict(r) for r in cur.fetchall()]
     finally:
@@ -125,8 +140,8 @@ def query_by_cases(numbers: Set[str]) -> List[dict]:
         cur = conn.execute(
             f"SELECT {','.join(_COLS)} FROM hearings"
             f" WHERE case_number IN ({placeholders})"
-            " ORDER BY date, time",
-            nums,
+            " ORDER BY date, time LIMIT ?",
+            [*nums, MAX_RESULTS],
         )
         return [dict(r) for r in cur.fetchall()]
     finally:
